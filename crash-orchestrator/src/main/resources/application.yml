@@ -1,0 +1,89 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: crash-orchestrator
+  
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: gpt-5-nano
+          temperature: 0.7
+    
+    # MCP Client configuration to connect to all specialist agents
+    mcp:
+      client:
+        enabled: true
+        toolcallback:
+          enabled: true
+        type: SYNC
+        sse:
+          connections:
+            # Impact Analyst Agent
+            impact-analyst:
+              url: ${IMPACT_ANALYST_URL:http://localhost:8081}
+            # Environment Agent  
+            environment:
+              url: ${ENVIRONMENT_URL:http://localhost:8082}
+            # Policy Agent
+            policy:
+              url: ${POLICY_URL:http://localhost:8083}
+            # Services Agent
+            services:
+              url: ${SERVICES_URL:http://localhost:8084}
+            # Communications Agent
+            communications:
+              url: ${COMMUNICATIONS_URL:http://localhost:8085}
+
+# Embabel configuration
+embabel:
+  models:
+    default-llm: gpt-5-nano
+    llms:
+      best: gpt-5-nano
+      cheapest: gpt-5-nano
+  agent:
+    logging:
+      prompts: true
+      responses: true
+      planning: true
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.insurancemegacorp.crash: DEBUG
+    com.embabel: DEBUG
+    org.springframework.ai.mcp: DEBUG
+
+---
+# Shell profile for interactive CLI
+spring:
+  config:
+    activate:
+      on-profile: shell
+  main:
+    web-application-type: none
+
+---
+# Demo profile with simulated delays for visual effect
+spring:
+  config:
+    activate:
+      on-profile: demo
+
+crash:
+  demo:
+    simulate-latency: true
+    latency-ms: 500

@@ -1,0 +1,111 @@
+services:
+  # Impact Analyst MCP Server
+  impact-analyst:
+    build:
+      context: ./crash-mcp-impact-analyst
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Environment MCP Server
+  environment:
+    build:
+      context: ./crash-mcp-environment
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Policy MCP Server
+  policy:
+    build:
+      context: ./crash-mcp-policy
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Services MCP Server
+  services-agent:
+    build:
+      context: ./crash-mcp-services
+      dockerfile: Dockerfile
+    ports:
+      - "8084:8084"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Communications MCP Server
+  communications:
+    build:
+      context: ./crash-mcp-communications
+      dockerfile: Dockerfile
+    ports:
+      - "8085:8085"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # CRASH Orchestrator (Embabel)
+  orchestrator:
+    build:
+      context: ./crash-orchestrator
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - IMPACT_ANALYST_URL=http://impact-analyst:8081
+      - ENVIRONMENT_URL=http://environment:8082
+      - POLICY_URL=http://policy:8083
+      - SERVICES_URL=http://services-agent:8084
+      - COMMUNICATIONS_URL=http://communications:8085
+    depends_on:
+      impact-analyst:
+        condition: service_healthy
+      environment:
+        condition: service_healthy
+      policy:
+        condition: service_healthy
+      services-agent:
+        condition: service_healthy
+      communications:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  default:
+    name: crash-network

@@ -1,0 +1,40 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: crash-environment
+  ai:
+    mcp:
+      server:
+        name: environment-agent
+        version: 1.0.0
+        type: SYNC
+        sse-message-endpoint: /mcp/messages
+        instructions: |
+          Environment Agent - Gathers environmental context for accident locations.
+          Provides weather conditions, location details, and road conditions.
+          
+          Available tools:
+          - get_weather: Get weather at specific coordinates and time
+          - reverse_geocode: Convert GPS coordinates to street address
+          - get_road_conditions: Get road surface and traffic conditions
+          - get_full_environment_context: Complete environmental report
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.insurancemegacorp.crash: DEBUG
+    org.springframework.ai.mcp: DEBUG

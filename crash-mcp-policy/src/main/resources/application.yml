@@ -1,0 +1,39 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: crash-policy
+  ai:
+    mcp:
+      server:
+        name: policy-agent
+        version: 1.0.0
+        type: SYNC
+        sse-message-endpoint: /mcp/messages
+        instructions: |
+          Policy Agent - Retrieves insurance policy, driver, and vehicle information.
+          
+          Available tools:
+          - lookup_policy: Get policy details and coverage information
+          - get_driver_profile: Get driver contact info and risk score
+          - get_vehicle_details: Get vehicle make, model, and value
+          - get_full_policy_info: Complete policy information in one call
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.insurancemegacorp.crash: DEBUG
+    org.springframework.ai.mcp: DEBUG

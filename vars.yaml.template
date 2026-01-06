@@ -1,0 +1,45 @@
+# CRASH - Claims Response Agent System Hive
+# Configuration Variables Template
+#
+# Copy this file to vars.yaml and fill in your values:
+#   cp vars.yaml.template vars.yaml
+#
+# vars.yaml is git-ignored to keep secrets safe
+
+# OpenAI Configuration
+openai:
+  api_key: "sk-your-openai-api-key-here"
+  model: "gpt-5-nano"
+
+# Optional: Anthropic Configuration (if using Claude models)
+anthropic:
+  api_key: ""
+
+# Service Ports (defaults shown - change if needed)
+ports:
+  orchestrator: 8080
+  impact_analyst: 8081
+  environment: 8082
+  policy: 8083
+  services: 8084
+  communications: 8085
+
+# Service URLs (used by orchestrator to connect to MCP servers)
+# Only change these if running services on different hosts
+urls:
+  impact_analyst: "http://localhost:8081"
+  environment: "http://localhost:8082"
+  policy: "http://localhost:8083"
+  services: "http://localhost:8084"
+  communications: "http://localhost:8085"
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARN, ERROR
+
+# Impact Analysis Thresholds
+thresholds:
+  severe_g_force: 5.0
+  moderate_g_force: 3.0
+  severe_speed_delta: 45
+  moderate_speed_delta: 25

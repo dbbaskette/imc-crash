@@ -1,0 +1,48 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: crash-impact-analyst
+  ai:
+    mcp:
+      server:
+        name: impact-analyst
+        version: 1.0.0
+        type: SYNC
+        sse-message-endpoint: /mcp/messages
+        instructions: |
+          Impact Analyst Agent - Analyzes vehicle telemetry data from safe driver apps
+          to classify accident severity and impact type.
+          
+          Available tools:
+          - analyze_impact: Full impact analysis from telemetry data
+          - is_accident_detected: Quick check if g-force exceeds accident threshold
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+
+# Severity thresholds (configurable)
+crash:
+  impact:
+    thresholds:
+      severe-g-force: 5.0
+      moderate-g-force: 3.0
+      severe-speed-delta: 45
+      moderate-speed-delta: 25
+
+# Actuator for health checks
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.insurancemegacorp.crash: DEBUG
+    org.springframework.ai.mcp: DEBUG

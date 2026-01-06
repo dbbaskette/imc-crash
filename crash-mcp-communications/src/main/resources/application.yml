@@ -1,0 +1,41 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: crash-communications
+  ai:
+    mcp:
+      server:
+        name: communications-agent
+        version: 1.0.0
+        type: SYNC
+        sse-message-endpoint: /mcp/messages
+        instructions: |
+          Communications Agent - Handles driver and adjuster communications.
+          
+          Available tools:
+          - send_sms: Send SMS message to driver
+          - send_push_notification: Send push notification via mobile app
+          - notify_adjuster: Notify claims adjuster about new claim
+          - dispatch_roadside_assistance: Dispatch roadside assistance
+          - log_communication_event: Log communication for audit trail
+          - get_full_communications_status: Get complete communication status
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.insurancemegacorp.crash: DEBUG
+    org.springframework.ai.mcp: DEBUG

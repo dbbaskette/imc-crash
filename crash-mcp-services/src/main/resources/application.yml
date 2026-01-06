@@ -1,0 +1,40 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: crash-services
+  ai:
+    mcp:
+      server:
+        name: services-agent
+        version: 1.0.0
+        type: SYNC
+        sse-message-endpoint: /mcp/messages
+        instructions: |
+          Services Agent - Finds nearby services relevant to accident response.
+          
+          Available tools:
+          - find_body_shops: Find nearby auto body repair shops
+          - find_tow_services: Find nearby tow truck services with ETAs
+          - find_medical_facilities: Find nearby hospitals and urgent care
+          - find_rental_cars: Find nearby rental car locations
+          - get_all_nearby_services: Get all services based on severity
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.insurancemegacorp.crash: DEBUG
+    org.springframework.ai.mcp: DEBUG

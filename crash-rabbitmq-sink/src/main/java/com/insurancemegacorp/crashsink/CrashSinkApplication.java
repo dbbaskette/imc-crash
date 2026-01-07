@@ -1,7 +1,10 @@
 package com.insurancemegacorp.crashsink;
 
+import com.embabel.agent.config.annotation.EnableAgents;
+import com.insurancemegacorp.crashsink.config.McpToolGroupsConfiguration;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Import;
 
 /**
  * CRASH RabbitMQ Sink Application.
@@ -11,6 +14,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * and an output queue.
  */
 @SpringBootApplication
+@EnableAgents
+@Import(McpToolGroupsConfiguration.class)
 public class CrashSinkApplication {
 
     public static void main(String[] args) {

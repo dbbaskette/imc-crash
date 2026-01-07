@@ -43,13 +43,13 @@ public class ImpactAnalystService {
             @ToolParam(description = "Posted speed limit in mph") 
             int speedLimitMph,
             
-            @ToolParam(description = "Accelerometer X-axis reading (lateral)") 
+            @ToolParam(description = "Accelerometer X-axis reading (longitudinal/front-back: negative=deceleration, positive=pushed forward)")
             double accelerometerX,
-            
-            @ToolParam(description = "Accelerometer Y-axis reading (longitudinal)") 
+
+            @ToolParam(description = "Accelerometer Y-axis reading (lateral/left-right: side impacts)")
             double accelerometerY,
-            
-            @ToolParam(description = "Accelerometer Z-axis reading (vertical)") 
+
+            @ToolParam(description = "Accelerometer Z-axis reading (vertical/up-down: rollovers)")
             double accelerometerZ
     ) {
         // Classify severity

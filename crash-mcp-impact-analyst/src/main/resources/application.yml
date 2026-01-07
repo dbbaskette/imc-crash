@@ -13,6 +13,9 @@ spring:
         protocol: STREAMABLE
         streamable-http:
           mcp-endpoint: /mcp
+        annotation-scanner:
+          enabled: true
+          packages: com.insurancemegacorp.crash.impact
         instructions: |
           Impact Analyst Agent - Analyzes vehicle telemetry data from safe driver apps
           to classify accident severity and impact type.

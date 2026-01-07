@@ -67,6 +67,8 @@ spring:
         enabled: true
         type: SYNC
         request-timeout: 30s
+        toolcallback:
+          enabled: true
         streamable-http:
           connections:
             impact-analyst:
@@ -90,6 +92,9 @@ embabel:
   agent:
     llm:
       default: gpt-5-nano
+    platform:
+      scanning:
+        packages: com.embabel.agent,com.insurancemegacorp.crashsink
 
 # Server configuration
 server:

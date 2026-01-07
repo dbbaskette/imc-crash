@@ -31,7 +31,10 @@ public class CrashAgent {
      * Action 1: Analyze the impact using the Impact Analyst MCP server.
      * This is typically executed first as severity classification affects other actions.
      */
-    @Action(description = "Analyze accident telemetry to determine severity and impact type")
+    @Action(
+        description = "Analyze accident telemetry to determine severity and impact type",
+        toolGroups = {"impact-analyst-tools"}
+    )
     public ImpactAnalysis analyzeImpact(AccidentEvent event, Ai ai) {
         log.info("Analyzing impact for accident: policyId={}, gForce={}", event.policyId(), event.gForce());
         return ai.withAutoLlm().createObject(
@@ -63,7 +66,10 @@ public class CrashAgent {
      * Action 2: Gather environmental context using the Environment MCP server.
      * Can run in parallel with Policy lookup (no dependency).
      */
-    @Action(description = "Gather weather, location, and road conditions at accident site")
+    @Action(
+        description = "Gather weather, location, and road conditions at accident site",
+        toolGroups = {"environment-tools"}
+    )
     public EnvironmentContext gatherEnvironment(AccidentEvent event, Ai ai) {
         log.info("Gathering environment for accident: lat={}, lon={}", event.latitude(), event.longitude());
         return ai.withAutoLlm().createObject(
@@ -89,7 +95,10 @@ public class CrashAgent {
      * Action 3: Look up policy information using the Policy MCP server.
      * Can run in parallel with Environment gathering (no dependency).
      */
-    @Action(description = "Retrieve policy, driver, and vehicle information")
+    @Action(
+        description = "Retrieve policy, driver, and vehicle information",
+        toolGroups = {"policy-tools"}
+    )
     public PolicyInfo lookupPolicy(AccidentEvent event, Ai ai) {
         log.info("Looking up policy: policyId={}, driverId={}", event.policyId(), event.driverId());
         return ai.withAutoLlm().createObject(
@@ -117,7 +126,10 @@ public class CrashAgent {
      * Action 4: Find nearby services using the Services MCP server.
      * Depends on ImpactAnalysis for severity-based recommendations.
      */
-    @Action(description = "Find nearby body shops, tow services, and hospitals based on severity")
+    @Action(
+        description = "Find nearby body shops, tow services, and hospitals based on severity",
+        toolGroups = {"services-tools"}
+    )
     public NearbyServices findServices(AccidentEvent event, ImpactAnalysis impact, Ai ai) {
         log.info("Finding services for accident: severity={}, location=({}, {})",
                 impact.severity(), event.latitude(), event.longitude());
@@ -145,7 +157,10 @@ public class CrashAgent {
      * Action 5: Initiate communications using the Communications MCP server.
      * Depends on PolicyInfo for driver contact information and ImpactAnalysis for severity.
      */
-    @Action(description = "Send driver wellness check and notify adjuster if needed")
+    @Action(
+        description = "Send driver wellness check and notify adjuster if needed",
+        toolGroups = {"communications-tools"}
+    )
     public CommunicationsStatus initiateComms(
             AccidentEvent event,
             PolicyInfo policy,

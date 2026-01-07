@@ -140,6 +140,34 @@ services:
       timeout: 5s
       retries: 5
 
+  # Telematics Generator - generates realistic vehicle telemetry with accidents
+  telematics-gen:
+    build:
+      context: ../imc-telematics-gen
+      dockerfile: Dockerfile
+    ports:
+      - "8087:8087"
+    environment:
+      - SPRING_PROFILES_ACTIVE=local
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - TELEMATICS_EXCHANGE_NAME=telematics_exchange
+      - TELEMATICS_SIMULATION_INTERVAL_MS=5000  # 1 message every 5 seconds per driver
+      - TELEMATICS_SIMULATION_DRIVER_COUNT=3
+      - TELEMATICS_SIMULATION_CRASH_FREQUENCY=10  # Crash every 10 messages (frequent for testing)
+      - TELEMATICS_SIMULATION_MIN_CRASH_GFORCE=2.5
+      - SERVER_PORT=8087
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8087/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # CRASH RabbitMQ Sink - consumes from queue, generates FNOL
   crash-sink:
     build:
@@ -179,6 +207,8 @@ services:
       services-agent:
         condition: service_healthy
       communications:
+        condition: service_healthy
+      telematics-gen:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8086/actuator/health"]

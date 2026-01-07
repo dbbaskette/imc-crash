@@ -1,11 +1,13 @@
 package com.insurancemegacorp.crashsink;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Represents a flattened telemetry message from the vehicle telematics system.
- * This matches the 35-field JSON schema output by imc-telemetry-processor.
+ * This matches the JSON schema output by imc-telematics-gen.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record TelemetryMessage(
     // Core identifiers
     @JsonProperty("policy_id") int policyId,
@@ -36,7 +38,7 @@ public record TelemetryMessage(
     @JsonProperty("gps_longitude") double gpsLongitude,
     @JsonProperty("current_street") String currentStreet,
     @JsonProperty("heading_degrees") Double headingDegrees,
-    @JsonProperty("altitude_meters") Double altitudeMeters,
+    @JsonProperty("gps_altitude") Double gpsAltitude,
     @JsonProperty("gps_accuracy_meters") Double gpsAccuracyMeters,
 
     // Device status
@@ -60,7 +62,10 @@ public record TelemetryMessage(
     @JsonProperty("airbag_deployed") Boolean airbagDeployed,
     @JsonProperty("seatbelt_fastened") Boolean seatbeltFastened,
     @JsonProperty("doors_locked") Boolean doorsLocked,
-    @JsonProperty("hazard_lights_on") Boolean hazardLightsOn
+    @JsonProperty("hazard_lights_on") Boolean hazardLightsOn,
+
+    // Accident metadata (added by telematics generator for crash events)
+    @JsonProperty("accident_type") String accidentType
 ) {
     /**
      * Calculate the 3D accelerometer magnitude.

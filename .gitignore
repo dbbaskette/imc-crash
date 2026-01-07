@@ -52,3 +52,6 @@ docker-compose.override.yml
 # Test output
 test-output/
 pids/
+
+# Claude plans symlink (actual file stored in ~/.claude/plans/)
+INTEGRATION-PLAN.md

@@ -20,23 +20,29 @@ spring:
         toolcallback:
           enabled: true
         type: SYNC
-        sse:
+        request-timeout: 30s
+        streamable-http:
           connections:
             # Impact Analyst Agent
             impact-analyst:
               url: ${IMPACT_ANALYST_URL:http://localhost:8081}
-            # Environment Agent  
+              endpoint: /mcp
+            # Environment Agent
             environment:
               url: ${ENVIRONMENT_URL:http://localhost:8082}
+              endpoint: /mcp
             # Policy Agent
             policy:
               url: ${POLICY_URL:http://localhost:8083}
+              endpoint: /mcp
             # Services Agent
             services:
               url: ${SERVICES_URL:http://localhost:8084}
+              endpoint: /mcp
             # Communications Agent
             communications:
               url: ${COMMUNICATIONS_URL:http://localhost:8085}
+              endpoint: /mcp
 
 # Embabel configuration
 embabel:

@@ -1,0 +1,124 @@
+spring:
+  application:
+    name: crash-rabbitmq-sink
+
+  # Spring Cloud Stream configuration
+  cloud:
+    function:
+      definition: processTelemetry
+    stream:
+      bindings:
+        # Input: Vehicle accident events from telemetry processor tap
+        processTelemetry-in-0:
+          destination: ${TELEMETRY_INPUT_DESTINATION:telemetry-to-processor.imc-telemetry-processor}
+          group: ${TELEMETRY_INPUT_GROUP:crash-sink-group}
+          consumer:
+            concurrency: ${CONSUMER_CONCURRENCY:1}
+        # Output: FNOL reports for downstream claims systems
+        processTelemetry-out-0:
+          destination: ${FNOL_OUTPUT_DESTINATION:fnol_reports}
+      rabbit:
+        bindings:
+          processTelemetry-in-0:
+            consumer:
+              exchangeType: topic
+              bindingRoutingKey: "#"
+          processTelemetry-out-0:
+            producer:
+              routingKeyExpression: "'fnol.' + headers['severity']"
+
+  # JPA/Database configuration
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/crash}
+    username: ${DATABASE_USERNAME:crash}
+    password: ${DATABASE_PASSWORD:crash}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # Spring AI configuration
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      chat:
+        options:
+          model: ${OPENAI_MODEL:gpt-5-nano}
+          temperature: ${OPENAI_TEMPERATURE:0.3}
+    mcp:
+      client:
+        enabled: true
+        type: SYNC
+        request-timeout: 30s
+        streamable-http:
+          connections:
+            impact-analyst:
+              url: ${MCP_IMPACT_ANALYST_URL:http://localhost:8081}
+              endpoint: /mcp
+            environment:
+              url: ${MCP_ENVIRONMENT_URL:http://localhost:8082}
+              endpoint: /mcp
+            policy:
+              url: ${MCP_POLICY_URL:http://localhost:8083}
+              endpoint: /mcp
+            services:
+              url: ${MCP_SERVICES_URL:http://localhost:8084}
+              endpoint: /mcp
+            communications:
+              url: ${MCP_COMMUNICATIONS_URL:http://localhost:8085}
+              endpoint: /mcp
+
+# Embabel agent configuration
+embabel:
+  agent:
+    llm:
+      default: gpt-5-nano
+
+# Server configuration
+server:
+  port: ${PORT:8086}
+
+# Actuator/Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+# Logging
+logging:
+  level:
+    com.insurancemegacorp: ${LOG_LEVEL:INFO}
+    com.embabel: INFO
+    org.springframework.ai: INFO
+    org.springframework.cloud.stream: INFO
+
+---
+# Local/Docker profile
+spring:
+  config:
+    activate:
+      on-profile: local
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+---
+# Cloud Foundry profile
+spring:
+  config:
+    activate:
+      on-profile: cloud
+  # CF will auto-configure RabbitMQ and PostgreSQL from bound services

@@ -10,7 +10,9 @@ spring:
         name: services-agent
         version: 1.0.0
         type: SYNC
-        sse-message-endpoint: /mcp/messages
+        protocol: STREAMABLE
+        streamable-http:
+          mcp-endpoint: /mcp
         instructions: |
           Services Agent - Finds nearby services relevant to accident response.
           

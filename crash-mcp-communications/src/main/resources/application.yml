@@ -10,7 +10,9 @@ spring:
         name: communications-agent
         version: 1.0.0
         type: SYNC
-        sse-message-endpoint: /mcp/messages
+        protocol: STREAMABLE
+        streamable-http:
+          mcp-endpoint: /mcp
         instructions: |
           Communications Agent - Handles driver and adjuster communications.
           

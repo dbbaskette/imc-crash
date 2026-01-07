@@ -10,7 +10,9 @@ spring:
         name: environment-agent
         version: 1.0.0
         type: SYNC
-        sse-message-endpoint: /mcp/messages
+        protocol: STREAMABLE
+        streamable-http:
+          mcp-endpoint: /mcp
         instructions: |
           Environment Agent - Gathers environmental context for accident locations.
           Provides weather conditions, location details, and road conditions.

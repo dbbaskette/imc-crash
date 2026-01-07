@@ -10,7 +10,9 @@ spring:
         name: policy-agent
         version: 1.0.0
         type: SYNC
-        sse-message-endpoint: /mcp/messages
+        protocol: STREAMABLE
+        streamable-http:
+          mcp-endpoint: /mcp
         instructions: |
           Policy Agent - Retrieves insurance policy, driver, and vehicle information.
           

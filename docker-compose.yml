@@ -1,4 +1,38 @@
 services:
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  # PostgreSQL Database for FNOL persistence
+  postgres:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=crash
+      - POSTGRES_USER=crash
+      - POSTGRES_PASSWORD=crash
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crash -d crash"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   # Impact Analyst MCP Server
   impact-analyst:
     build:
@@ -74,7 +108,7 @@ services:
       timeout: 5s
       retries: 3
 
-  # CRASH Orchestrator (Embabel)
+  # CRASH Orchestrator (Embabel) - for direct API testing
   orchestrator:
     build:
       context: ./crash-orchestrator
@@ -106,6 +140,56 @@ services:
       timeout: 5s
       retries: 5
 
+  # CRASH RabbitMQ Sink - consumes from queue, generates FNOL
+  crash-sink:
+    build:
+      context: ./crash-rabbitmq-sink
+      dockerfile: Dockerfile
+    ports:
+      - "8086:8086"
+    environment:
+      - SPRING_PROFILES_ACTIVE=local
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # RabbitMQ connection
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      # PostgreSQL connection
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/crash
+      - SPRING_DATASOURCE_USERNAME=crash
+      - SPRING_DATASOURCE_PASSWORD=crash
+      # MCP agent connections
+      - MCP_IMPACT_ANALYST_URL=http://impact-analyst:8081
+      - MCP_ENVIRONMENT_URL=http://environment:8082
+      - MCP_POLICY_URL=http://policy:8083
+      - MCP_SERVICES_URL=http://services-agent:8084
+      - MCP_COMMUNICATIONS_URL=http://communications:8085
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      impact-analyst:
+        condition: service_healthy
+      environment:
+        condition: service_healthy
+      policy:
+        condition: service_healthy
+      services-agent:
+        condition: service_healthy
+      communications:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 networks:
   default:
     name: crash-network
+
+volumes:
+  rabbitmq_data:
+  postgres_data:

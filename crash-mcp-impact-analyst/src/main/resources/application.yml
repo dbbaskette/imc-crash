@@ -10,7 +10,9 @@ spring:
         name: impact-analyst
         version: 1.0.0
         type: SYNC
-        sse-message-endpoint: /mcp/messages
+        protocol: STREAMABLE
+        streamable-http:
+          mcp-endpoint: /mcp
         instructions: |
           Impact Analyst Agent - Analyzes vehicle telemetry data from safe driver apps
           to classify accident severity and impact type.

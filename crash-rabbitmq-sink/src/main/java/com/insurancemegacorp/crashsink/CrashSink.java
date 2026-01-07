@@ -8,6 +8,8 @@ import com.insurancemegacorp.crash.domain.FNOLReport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
 import java.util.function.Function;
@@ -46,9 +48,13 @@ public class CrashSink {
     /**
      * Spring Cloud Stream function that processes incoming telemetry messages.
      * Deserializes to TelemetryMessage, maps to AccidentEvent, and processes.
+     *
+     * Outputs to TWO destinations:
+     * - processTelemetry-out-0: vehicle_events queue (original TelemetryMessage for JDBC sink)
+     * - processTelemetry-out-1: fnol_reports queue (enriched FNOLReport for claims systems)
      */
     @Bean
-    public Function<String, String> processTelemetry() {
+    public Function<String, Message<?>[]> processTelemetry() {
         return message -> {
             try {
                 // Deserialize to typed TelemetryMessage
@@ -98,11 +104,27 @@ public class CrashSink {
                     // Continue processing even if persistence fails
                 }
 
-                // Phase 5: Return serialized report for output queue binding
+                // Phase 5: Dual output to both queues
+                String severity = report.impact() != null ? report.impact().severity().name() : "UNKNOWN";
+
+                // Output 0: Original TelemetryMessage format for vehicle_events queue (JDBC Sink compatibility)
+                Message<String> vehicleEventsMessage = MessageBuilder
+                    .withPayload(message)  // Original telemetry JSON
+                    .setHeader("severity", severity)
+                    .build();
+
+                // Output 1: Enriched FNOLReport for fnol_reports queue (Claims Systems)
                 String reportJson = mapper.writeValueAsString(report);
-                log.info("Publishing FNOL to output queue: severity={}",
-                        report.impact() != null ? report.impact().severity() : "UNKNOWN");
-                return reportJson;
+                Message<String> fnolReportMessage = MessageBuilder
+                    .withPayload(reportJson)
+                    .setHeader("severity", severity)
+                    .setHeader("claimNumber", report.claimNumber())
+                    .build();
+
+                log.info("Publishing to dual outputs: vehicle_events (JDBC) + fnol_reports (Claims), severity={}",
+                        severity);
+
+                return new Message<?>[] { vehicleEventsMessage, fnolReportMessage };
 
             } catch (Exception e) {
                 log.error("Failed to process accident event: {}", e.getMessage(), e);

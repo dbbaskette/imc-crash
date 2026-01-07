@@ -107,26 +107,70 @@ public class ImpactAnalystService {
         }
     }
 
+    /**
+     * Enhanced impact type detection based on 9 accident type sensor profiles.
+     *
+     * Accident types from telemetry generator:
+     * - ROLLOVER: Extreme Z-axis (-8 to 8 g), chaotic rotation
+     * - HEAD_ON: Extreme negative X (-8 to -12 g)
+     * - T_BONE: Strong lateral Y (5 to 9 g)
+     * - SINGLE_VEHICLE: Strong negative X (-5 to -9 g)
+     * - REAR_END_COLLISION: Negative X (-4 to -8 g)
+     * - MULTI_VEHICLE_PILEUP: Moderate negative X, varied axes
+     * - REAR_ENDED: Positive X (2 to 6 g) - pushed forward
+     * - SIDE_SWIPE: Moderate lateral Y (2 to 4 g)
+     * - HIT_AND_RUN: Varied, moderate forces
+     */
     private ImpactType determineImpactType(double x, double y, double z) {
         double absX = Math.abs(x);
         double absY = Math.abs(y);
         double absZ = Math.abs(z);
-        
-        // Check for rollover (high Z-axis)
-        if (absZ > 2.0 && absZ > absX && absZ > absY) {
+
+        // ROLLOVER: Extreme Z-axis or very high Z relative to others
+        // Profile: accelZ range -8 to 8, dominant axis
+        if (absZ > 6.0 || (absZ > 4.0 && absZ > absX * 1.5 && absZ > absY * 1.5)) {
             return ImpactType.ROLLOVER;
         }
-        
-        // Frontal or rear impact (high Y-axis - longitudinal)
-        if (absY > absX) {
-            return y < 0 ? ImpactType.FRONTAL : ImpactType.REAR;
+
+        // T_BONE: Strong lateral Y-axis impact (side impact, perpendicular)
+        // Profile: accelY range 5 to 9, dominant axis
+        if (absY > 4.5 && absY > absX * 1.5) {
+            return ImpactType.SIDE;  // Severe side impact (T-bone)
         }
-        
-        // Side impact (high X-axis - lateral)
-        if (absX > absY) {
+
+        // HEAD_ON: Extreme frontal deceleration
+        // Profile: accelX range -8 to -12 (most extreme)
+        if (x < -7.0) {
+            return ImpactType.FRONTAL;  // Head-on collision
+        }
+
+        // SINGLE_VEHICLE / REAR_END_COLLISION: Strong frontal impact
+        // Profile: accelX range -5 to -9 (single vehicle) or -4 to -8 (rear-end)
+        if (x < -3.5 && absX > absY) {
+            return ImpactType.FRONTAL;  // Includes rear-end collision, single vehicle
+        }
+
+        // REAR_ENDED: Positive X (vehicle pushed forward)
+        // Profile: accelX range 2 to 6 (positive = forward jolt)
+        if (x > 1.5 && absX > absY) {
+            return ImpactType.REAR;  // Struck from behind
+        }
+
+        // SIDE_SWIPE: Moderate lateral impact
+        // Profile: accelY range 2 to 4 (less than T-bone)
+        if (absY > 1.5 && absY > absX) {
+            return ImpactType.SIDE;  // Side-swipe or glancing side impact
+        }
+
+        // MULTI_VEHICLE_PILEUP / HIT_AND_RUN: Varied forces, less clear pattern
+        // Default to dominant axis if we have clear readings
+        if (absX > absY && absX > absZ) {
+            return x < 0 ? ImpactType.FRONTAL : ImpactType.REAR;
+        }
+        if (absY > absX && absY > absZ) {
             return ImpactType.SIDE;
         }
-        
+
         return ImpactType.UNKNOWN;
     }
 

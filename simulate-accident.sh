@@ -14,7 +14,7 @@ RABBITMQ_USER="${RABBITMQ_USER:-guest}"
 RABBITMQ_PASS="${RABBITMQ_PASS:-guest}"
 
 # Queue name matching the tap from telemetry processor
-EXCHANGE="telemetry-to-processor.imc-telemetry-processor"
+EXCHANGE="telematics_exchange"
 ROUTING_KEY=""
 
 # Parse severity argument

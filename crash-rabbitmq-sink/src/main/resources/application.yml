@@ -8,24 +8,37 @@ spring:
       definition: processTelemetry
     stream:
       bindings:
-        # Input: Vehicle accident events from telemetry processor tap
+        # Input: Vehicle accident events from telemetry exchange
         processTelemetry-in-0:
-          destination: ${TELEMETRY_INPUT_DESTINATION:telemetry-to-processor.imc-telemetry-processor}
+          destination: ${TELEMETRY_INPUT_DESTINATION:telematics_exchange}
           group: ${TELEMETRY_INPUT_GROUP:crash-sink-group}
           consumer:
             concurrency: ${CONSUMER_CONCURRENCY:1}
-        # Output: FNOL reports for downstream claims systems
+
+        # Output 0: vehicle_events queue (original format for JDBC Sink compatibility)
         processTelemetry-out-0:
-          destination: ${FNOL_OUTPUT_DESTINATION:fnol_reports}
+          destination: ${VEHICLE_EVENTS_DESTINATION:vehicle_events}
+
+        # Output 1: fnol_reports queue (enriched reports for claims systems)
+        processTelemetry-out-1:
+          destination: ${FNOL_REPORTS_DESTINATION:fnol_reports}
+
       rabbit:
         bindings:
           processTelemetry-in-0:
             consumer:
-              exchangeType: topic
+              exchangeType: fanout
               bindingRoutingKey: "#"
+
           processTelemetry-out-0:
             producer:
-              routingKeyExpression: "'fnol.' + headers['severity']"
+              exchangeType: topic
+              routingKeyExpression: "headers.containsKey('severity') ? 'vehicle.accident.' + headers['severity'].toString().toLowerCase() : 'vehicle.accident.unknown'"
+
+          processTelemetry-out-1:
+            producer:
+              exchangeType: topic
+              routingKeyExpression: "headers.containsKey('severity') ? 'fnol.' + headers['severity'].toString().toLowerCase() : 'fnol.unknown'"
 
   # JPA/Database configuration
   datasource:

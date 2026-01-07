@@ -4,6 +4,7 @@ import com.embabel.agent.config.annotation.EnableAgents;
 import com.insurancemegacorp.crashsink.config.McpToolGroupsConfiguration;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Import;
 
 /**
@@ -14,6 +15,10 @@ import org.springframework.context.annotation.Import;
  * and an output queue.
  */
 @SpringBootApplication
+@ComponentScan(basePackages = {
+    "com.insurancemegacorp.crashsink",  // Our project
+    "com.embabel.agent"                 // Force Embabel overlap
+})
 @EnableAgents
 @Import(McpToolGroupsConfiguration.class)
 public class CrashSinkApplication {

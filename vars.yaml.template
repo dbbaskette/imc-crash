@@ -6,10 +6,16 @@
 #
 # vars.yaml is git-ignored to keep secrets safe
 
-# OpenAI Configuration
+# Google Gemini Configuration (primary LLM for CRASH)
+# Get your API key at: https://aistudio.google.com/apikey
+google:
+  api_key: "YOUR_GOOGLE_API_KEY"
+  model: "gemini-2.5-flash"
+
+# Optional: OpenAI Configuration
 openai:
-  api_key: "sk-your-openai-api-key-here"
-  model: "gpt-5-nano"
+  api_key: ""
+  model: "gpt-4o"
 
 # Optional: Anthropic Configuration (if using Claude models)
 anthropic:

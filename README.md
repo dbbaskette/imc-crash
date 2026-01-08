@@ -145,14 +145,65 @@ curl -X POST "http://localhost:8080/api/accident/simulate?policyId=200020&gForce
 4. **Dependent Execution** — Services and Communications wait for required data
 5. **Report Compilation** — All results aggregated into comprehensive FNOL report
 
+### GOAP Execution Flow
+
+The system uses Goal-Oriented Action Planning to dynamically determine execution order based on dependencies:
+
+```mermaid
+flowchart TB
+    AE["AccidentEvent<br/>(from telemetry)"]
+
+    subgraph Level0["Level 0 - Parallel Execution (no dependencies)"]
+        direction LR
+        AI["analyzeImpact<br/><br/>MCP: Impact Analyst"]
+        GE["gatherEnvironment<br/><br/>MCP: Environment"]
+        LP["lookupPolicy<br/><br/>MCP: Policy"]
+    end
+
+    AE --> AI
+    AE --> GE
+    AE --> LP
+
+    AI --> |"ImpactAnalysis<br/>(severity)"| FS
+    AI --> |"ImpactAnalysis"| IC
+    LP --> |"PolicyInfo<br/>(driver contact)"| IC
+
+    subgraph Level1["Level 1 - Severity-Dependent Execution"]
+        direction LR
+        FS["findServices<br/><br/>MCP: Services<br/><br/>SEVERE: hospitals + tow<br/>MODERATE: tow + body<br/>MINOR: body shops only"]
+        IC["initiateComms<br/><br/>MCP: Communications<br/><br/>SEVERE: senior adjuster<br/>MODERATE: standard adjuster<br/>MINOR: SMS only"]
+    end
+
+    GE --> |"EnvironmentContext"| CR
+    FS --> |"NearbyServices"| CR
+    IC --> |"CommunicationsStatus"| CR
+    AI --> CR
+    LP --> CR
+
+    subgraph Level2["Level 2 - Goal Achievement"]
+        CR["compileReport<br/><br/>Aggregates all data into<br/>comprehensive FNOLReport"]
+    end
+
+    CR --> FNOL["FNOLReport"]
+
+    subgraph Level3["Level 3 - Final Action"]
+        SEND["sendFnolToAdjuster<br/><br/>MCP: Communications<br/>(Gmail SMTP Email)"]
+    end
+
+    FNOL --> SEND
+    SEND --> OUT["✅ GOAL ACHIEVED<br/>Email sent to adjuster<br/>FNOL persisted to DB"]
+
+    style OUT fill:#90EE90
+```
+
 ### Severity-Based Behavior
 
 The system adapts its response based on accident severity:
 
 | Severity | Services | Communications |
 |----------|----------|----------------|
-| **SEVERE** (g-force ≥ 5.0) | Prioritizes hospitals, immediate tow dispatch | Senior adjuster notified, roadside assistance dispatched |
-| **MODERATE** (g-force ≥ 3.0) | Body shops + tow services | Standard adjuster assigned |
+| **SEVERE** (g-force ≥ 5.0) | Hospitals + tow + body shops + rentals | Senior adjuster notified, roadside dispatched |
+| **MODERATE** (g-force ≥ 3.0) | Tow + body shops + rentals | Standard adjuster assigned |
 | **MINOR** (g-force < 3.0) | Body shop referrals only | SMS/push notification only |
 
 ## Project Structure

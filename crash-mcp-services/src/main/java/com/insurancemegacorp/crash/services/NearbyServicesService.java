@@ -186,42 +186,63 @@ public class NearbyServicesService {
 
     /**
      * Get all nearby services based on accident severity.
+     *
+     * Severity determines which services are included:
+     * - SEVERE: All services (hospitals, tow, body shops, rentals)
+     * - MODERATE: Tow, body shops, rentals (no hospitals)
+     * - MINOR: Body shops only (vehicle likely drivable)
      */
     @McpTool(description = "Get all relevant nearby services based on accident severity. " +
-                        "Includes body shops, tow services, hospitals (if severe), and rental cars.")
+                        "SEVERE: hospitals + tow + body + rentals. " +
+                        "MODERATE: tow + body + rentals. " +
+                        "MINOR: body shops only (vehicle drivable).")
     public NearbyServices getAllNearbyServices(
-            @McpToolParam(description = "Latitude coordinate of accident") 
+            @McpToolParam(description = "Latitude coordinate of accident")
             double latitude,
-            
-            @McpToolParam(description = "Longitude coordinate of accident") 
+
+            @McpToolParam(description = "Longitude coordinate of accident")
             double longitude,
-            
-            @McpToolParam(description = "Accident severity: MINOR, MODERATE, or SEVERE") 
+
+            @McpToolParam(description = "Accident severity: MINOR, MODERATE, or SEVERE")
             String severity,
-            
-            @McpToolParam(description = "Search radius in miles") 
+
+            @McpToolParam(description = "Search radius in miles")
             double radiusMiles
     ) {
+        // Body shops always included - every accident needs repair assessment
         List<ServiceLocation> bodyShops = findBodyShops(latitude, longitude, radiusMiles);
-        List<ServiceLocation> towServices = findTowServices(latitude, longitude, radiusMiles);
-        List<ServiceLocation> medical = severity.equals("SEVERE") 
-            ? findMedicalFacilities(latitude, longitude, radiusMiles) 
+
+        // Tow services only for MODERATE and SEVERE (vehicle not drivable)
+        List<ServiceLocation> towServices = severity.equals("MINOR")
+            ? List.of()
+            : findTowServices(latitude, longitude, radiusMiles);
+
+        // Medical facilities only for SEVERE (potential injuries)
+        List<ServiceLocation> medical = severity.equals("SEVERE")
+            ? findMedicalFacilities(latitude, longitude, radiusMiles)
             : List.of();
-        List<ServiceLocation> rentals = findRentalCars(latitude, longitude);
-        
+
+        // Rentals for MODERATE and SEVERE (will need replacement vehicle)
+        List<ServiceLocation> rentals = severity.equals("MINOR")
+            ? List.of()
+            : findRentalCars(latitude, longitude);
+
         // Determine if vehicle is drivable
         boolean drivable = severity.equals("MINOR");
-        
-        // Build dispatch recommendation
+
+        // Build dispatch recommendation based on severity
         String recommendation;
         if (severity.equals("SEVERE")) {
-            recommendation = "URGENT: Dispatch tow service immediately. Medical facilities alerted.";
+            recommendation = "URGENT: Dispatch tow service immediately. Medical facilities alerted. " +
+                           "Rental car pre-arranged.";
         } else if (severity.equals("MODERATE")) {
-            recommendation = "Tow service recommended - vehicle likely not drivable.";
+            recommendation = "Tow service recommended - vehicle likely not drivable. " +
+                           "Rental car information provided.";
         } else {
-            recommendation = "Vehicle may be drivable. Body shop referral provided.";
+            recommendation = "Vehicle appears drivable. Body shop referral provided for damage assessment. " +
+                           "No tow or rental needed at this time.";
         }
-        
+
         return new NearbyServices(
             bodyShops,
             towServices,

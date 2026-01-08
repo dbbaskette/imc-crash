@@ -86,13 +86,45 @@ Get all relevant nearby services based on accident severity.
 - `recommendation` - Dispatch recommendation
 - `vehicleDrivable` - Whether vehicle can be driven
 
-## Severity-Based Behavior
+## Severity-Based Service Selection
 
-| Severity | Body Shops | Tow Services | Hospitals | Rental Cars | Recommendation |
-|----------|------------|--------------|-----------|-------------|----------------|
-| **SEVERE** | Yes | Yes (urgent) | Yes | Yes | "URGENT: Dispatch tow immediately. Medical facilities alerted." |
-| **MODERATE** | Yes | Yes | No | Yes | "Tow service recommended - vehicle likely not drivable." |
-| **MINOR** | Yes | Yes | No | Yes | "Vehicle may be drivable. Body shop referral provided." |
+The agent intelligently selects which services to return based on accident severity:
+
+```mermaid
+flowchart LR
+    subgraph SEVERE["SEVERE Accident"]
+        S1["🏥 Hospitals"]
+        S2["🚗 Tow Services"]
+        S3["🔧 Body Shops"]
+        S4["🚙 Rental Cars"]
+    end
+
+    subgraph MODERATE["MODERATE Accident"]
+        M1["🚗 Tow Services"]
+        M2["🔧 Body Shops"]
+        M3["🚙 Rental Cars"]
+    end
+
+    subgraph MINOR["MINOR Accident"]
+        N1["🔧 Body Shops"]
+    end
+
+    style SEVERE fill:#ffcccc
+    style MODERATE fill:#fff3cd
+    style MINOR fill:#d4edda
+```
+
+| Severity | Body Shops | Tow Services | Hospitals | Rental Cars | Vehicle Drivable |
+|----------|:----------:|:------------:|:---------:|:-----------:|:----------------:|
+| **SEVERE** | ✅ | ✅ (urgent) | ✅ | ✅ | No |
+| **MODERATE** | ✅ | ✅ | ❌ | ✅ | No |
+| **MINOR** | ✅ | ❌ | ❌ | ❌ | Yes |
+
+### Recommendations by Severity
+
+- **SEVERE**: "URGENT: Dispatch tow service immediately. Medical facilities alerted. Rental car pre-arranged."
+- **MODERATE**: "Tow service recommended - vehicle likely not drivable. Rental car information provided."
+- **MINOR**: "Vehicle appears drivable. Body shop referral provided for damage assessment. No tow or rental needed at this time."
 
 ## Simulated Service Providers
 

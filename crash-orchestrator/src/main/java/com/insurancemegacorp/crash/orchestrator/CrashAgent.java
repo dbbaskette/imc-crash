@@ -379,6 +379,9 @@ public class CrashAgent {
         sb.append("\n");
         sb.append("Road Conditions:\n");
         sb.append("  Surface: ").append(report.environment().roadConditions().surfaceCondition()).append("\n");
+        if (report.environment().roadConditions().surfaceAssessmentReason() != null) {
+            sb.append("  Assessment: ").append(report.environment().roadConditions().surfaceAssessmentReason()).append("\n");
+        }
         sb.append("  Lanes: ").append(report.environment().roadConditions().numberOfLanes()).append("\n");
         if (report.environment().roadConditions().constructionZone()) {
             sb.append("  ⚠ CONSTRUCTION ZONE\n");

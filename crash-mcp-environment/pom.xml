@@ -35,6 +35,11 @@
             <groupId>com.insurancemegacorp</groupId>
             <artifactId>crash-domain</artifactId>
         </dependency>
+        <!-- Spring AI for LLM-based road surface assessment -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-google-genai</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

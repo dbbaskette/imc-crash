@@ -18,13 +18,13 @@ When a vehicle accident is detected via telemetry (g-force threshold exceeded fr
 
 Each agent is an independent microservice that contributes its expertise:
 
-| Agent | Responsibility |
-|-------|----------------|
-| **Impact Analyst** | Analyzes telemetry to classify severity (MINOR/MODERATE/SEVERE) and impact type |
-| **Environment** | Gathers weather (current + prior 24 hours), road conditions, and location context |
-| **Policy** | Retrieves insurance coverage, driver profile, and vehicle details |
-| **Services** | Locates nearby body shops, tow services, hospitals based on severity |
-| **Communications** | Handles driver outreach, SMS notifications, and adjuster alerts |
+| Agent | Port | Responsibility | Docs |
+|-------|------|----------------|------|
+| **Impact Analyst** | 8081 | Analyzes telemetry to classify severity and impact type | [README](crash-mcp-impact-analyst/README.md) |
+| **Environment** | 8082 | Gathers weather, road conditions, and location context | [README](crash-mcp-environment/README.md) |
+| **Policy** | 8083 | Retrieves insurance coverage, driver profile, and vehicle details | [README](crash-mcp-policy/README.md) |
+| **Services** | 8084 | Locates nearby body shops, tow services, hospitals | [README](crash-mcp-services/README.md) |
+| **Communications** | 8085 | Handles driver outreach, SMS, email, and adjuster alerts | [README](crash-mcp-communications/README.md) |
 
 ## Architecture
 
@@ -233,6 +233,15 @@ Three pre-configured policies are available for testing:
 
 For detailed information, see:
 - [BUILD.md](BUILD.md) — Comprehensive build guide, configuration reference, and extension instructions
+- [AGENTIC-ARCHITECTURE.md](AGENTIC-ARCHITECTURE.md) — Deep dive into GOAP planning and agent patterns
+
+### Agent Documentation
+Each agent has its own README with detailed tool documentation:
+- [Impact Analyst](crash-mcp-impact-analyst/README.md) — Severity classification, impact type detection, accelerometer analysis
+- [Environment](crash-mcp-environment/README.md) — Weather APIs, LLM-based road assessment, geocoding
+- [Policy](crash-mcp-policy/README.md) — Policy lookup, driver profiles, vehicle details
+- [Services](crash-mcp-services/README.md) — Nearby service location, severity-based recommendations
+- [Communications](crash-mcp-communications/README.md) — Twilio SMS, Gmail SMTP, adjuster notifications
 
 ## Extending CRASH
 

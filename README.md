@@ -18,47 +18,59 @@ When a vehicle accident is detected via telemetry (g-force threshold exceeded fr
 
 Each agent is an independent microservice that contributes its expertise:
 
-| Agent | Responsibility |
-|-------|----------------|
-| **Impact Analyst** | Analyzes telemetry to classify severity (MINOR/MODERATE/SEVERE) and impact type |
-| **Environment** | Gathers weather (current + prior 24 hours), road conditions, and location context |
-| **Policy** | Retrieves insurance coverage, driver profile, and vehicle details |
-| **Services** | Locates nearby body shops, tow services, hospitals based on severity |
-| **Communications** | Handles driver outreach, SMS notifications, and adjuster alerts |
+| Agent | Port | Responsibility | Docs |
+|-------|------|----------------|------|
+| **Impact Analyst** | 8081 | Analyzes telemetry to classify severity and impact type | [README](crash-mcp-impact-analyst/README.md) |
+| **Environment** | 8082 | Gathers weather, road conditions, and location context | [README](crash-mcp-environment/README.md) |
+| **Policy** | 8083 | Retrieves insurance coverage, driver profile, and vehicle details | [README](crash-mcp-policy/README.md) |
+| **Services** | 8084 | Locates nearby body shops, tow services, hospitals | [README](crash-mcp-services/README.md) |
+| **Communications** | 8085 | Handles driver outreach, SMS, email, and adjuster alerts | [README](crash-mcp-communications/README.md) |
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         CRASH ORCHESTRATOR (:8080)                          │
-│                      (Goal: Generate FNOL Report)                           │
-│                                                                             │
-│    Uses GOAP planning to determine execution order based on dependencies    │
-│                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    MCP Client Connections (SSE)                      │   │
-│  └──────┬──────────┬──────────┬──────────┬──────────┬──────────────────┘   │
-└─────────┼──────────┼──────────┼──────────┼──────────┼───────────────────────┘
-          │          │          │          │          │
-          ▼          ▼          ▼          ▼          ▼
-    ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-    │ IMPACT   │ │ENVIRON-  │ │ POLICY   │ │ SERVICES │ │  COMMS   │
-    │ ANALYST  │ │  MENT    │ │  AGENT   │ │  AGENT   │ │  AGENT   │
-    │  :8081   │ │  :8082   │ │  :8083   │ │  :8084   │ │  :8085   │
-    └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
-           \          |          |          |          /
-            \         |          |          |         /
-             +--------+----------+----------+--------+
-                              THE HIVE
-                    (Independent Specialist Agents)
+┌─────────────────┐     ┌──────────────┐     ┌─────────────────────────────────┐
+│  TELEMATICS-GEN │────▶│   RABBITMQ   │────▶│      CRASH ORCHESTRATOR         │
+│     (:8087)     │     │   (:5672)    │     │          (:8080)                │
+│                 │     │              │     │                                 │
+│  Simulates 15   │     │  telematics_ │     │  • Consumes crash events        │
+│  drivers with   │     │  exchange    │     │  • GOAP planning for FNOL       │
+│  realistic GPS  │     │  (fanout)    │     │  • Persists to PostgreSQL       │
+│  routes & crash │     │              │     │  • Emails FNOL to adjusters     │
+│  events         │     │  Publisher   │     │                                 │
+│                 │     │  Confirms    │     │                                 │
+└─────────────────┘     └──────────────┘     └────────────┬────────────────────┘
+                                                          │
+                                    MCP Client Connections (HTTP/SSE)
+                                                          │
+          ┌───────────────┬───────────────┬───────────────┼───────────────┐
+          │               │               │               │               │
+          ▼               ▼               ▼               ▼               ▼
+    ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
+    │ IMPACT   │   │ENVIRON-  │   │ POLICY   │   │ SERVICES │   │  COMMS   │
+    │ ANALYST  │   │  MENT    │   │  AGENT   │   │  AGENT   │   │  AGENT   │
+    │  :8081   │   │  :8082   │   │  :8083   │   │  :8084   │   │  :8085   │
+    │          │   │          │   │          │   │          │   │          │
+    │ Severity │   │ Nominatim│   │ Coverage │   │ Nearby   │   │ Twilio   │
+    │ Impact   │   │ Open-    │   │ Driver   │   │ Tow/Body │   │ Gmail    │
+    │ Type     │   │ Meteo    │   │ Vehicle  │   │ Hospital │   │ SMS/Email│
+    └──────────┘   └──────────┘   └──────────┘   └──────────┘   └──────────┘
+           \            |              |              |            /
+            \           |              |              |           /
+             +----------+--------------+--------------+----------+
+                                   THE HIVE
+                         (Independent Specialist Agents)
 ```
 
 **Key Technologies:**
 - **Embabel Agent Framework 0.3.2** — Goal-based planning orchestrator using GOAP (full Java support)
 - **Spring AI 1.1.2** — Model Context Protocol for agent communication via SSE
-- **Spring Boot 3.4.1** — Microservice foundation
-- **Claude Sonnet 4.5** — High-quality LLM for reasoning and planning (via Anthropic API)
+- **Spring Boot 3.5.x** — Microservice foundation
+- **Google Gemini 2.5 Flash** — Fast LLM for reasoning and planning (via Google AI API)
 - **Open-Meteo API** — Real weather data including 24-hour historical analysis
+- **OpenStreetMap Nominatim** — Real reverse geocoding for accident location addresses
+- **RabbitMQ** — Message broker with publisher confirms for reliable crash event delivery
+- **PostgreSQL** — FNOL report persistence
 
 ## Quick Start
 
@@ -67,7 +79,7 @@ Each agent is an independent microservice that contributes its expertise:
 - Java 21+
 - Maven 3.9+
 - Docker & Docker Compose
-- Anthropic API Key (Claude)
+- Google AI API Key (Gemini) — get one at https://aistudio.google.com/apikey
 
 ### 1. Clone and Build
 
@@ -87,7 +99,7 @@ cp vars.yaml.template vars.yaml
 
 **Option B: Environment variable**
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+export GOOGLE_API_KEY=AIza...
 ```
 
 ### 3. Start the Hive
@@ -150,15 +162,21 @@ The system adapts its response based on accident severity:
 ```
 imc-crash/
 ├── crash-domain/                   # Shared domain objects (Java Records)
-├── crash-orchestrator/             # Central orchestrator (:8080)
+├── crash-orchestrator/             # Central orchestrator + RabbitMQ sink (:8080/:8086)
 ├── crash-mcp-impact-analyst/       # Impact analysis agent (:8081)
 ├── crash-mcp-environment/          # Environment context agent (:8082)
 ├── crash-mcp-policy/               # Policy lookup agent (:8083)
 ├── crash-mcp-services/             # Services finder agent (:8084)
 ├── crash-mcp-communications/       # Communications agent (:8085)
-├── docker-compose.yml              # Container orchestration
-├── start.sh / stop.sh              # Convenience scripts
-└── BUILD.md                        # Detailed build documentation
+├── docker-compose.yml              # Container orchestration (all services)
+├── vars.yaml                       # Configuration (API keys, Twilio, Gmail)
+├── simulate-accident.sh            # CLI tool for manual accident simulation
+└── AGENTIC-ARCHITECTURE.md         # Deep dive into GOAP and agent patterns
+
+../imc-telematics-gen/              # Telematics simulator (sibling project)
+├── WebSocket dashboard             # Real-time driver monitoring UI
+├── 15 Atlanta drivers              # Realistic GPS routes
+└── Crash event generator           # Demo accident triggering
 ```
 
 ## API Reference
@@ -215,6 +233,15 @@ Three pre-configured policies are available for testing:
 
 For detailed information, see:
 - [BUILD.md](BUILD.md) — Comprehensive build guide, configuration reference, and extension instructions
+- [AGENTIC-ARCHITECTURE.md](AGENTIC-ARCHITECTURE.md) — Deep dive into GOAP planning and agent patterns
+
+### Agent Documentation
+Each agent has its own README with detailed tool documentation:
+- [Impact Analyst](crash-mcp-impact-analyst/README.md) — Severity classification, impact type detection, accelerometer analysis
+- [Environment](crash-mcp-environment/README.md) — Weather APIs, LLM-based road assessment, geocoding
+- [Policy](crash-mcp-policy/README.md) — Policy lookup, driver profiles, vehicle details
+- [Services](crash-mcp-services/README.md) — Nearby service location, severity-based recommendations
+- [Communications](crash-mcp-communications/README.md) — Twilio SMS, Gmail SMTP, adjuster notifications
 
 ## Extending CRASH
 
@@ -239,10 +266,14 @@ public RepairEstimate estimateRepairCost(
 
 ## Recent Enhancements
 
-- **24-Hour Weather History** — Environment agent now analyzes weather conditions for the 24 hours prior to the accident, detecting significant events like heavy precipitation, snow, freeze/thaw cycles, and thunderstorms that may have affected road conditions
-- **Claude Sonnet 4.5 Integration** — Switched from OpenAI to Anthropic Claude for more reliable LLM processing
-- **PostgreSQL Persistence** — FNOL reports are now persisted to a PostgreSQL database
-- **RabbitMQ Integration** — Telematics events are streamed via RabbitMQ for real-time processing
+- **Google Gemini 2.5 Flash** — Fast, reliable LLM for agent reasoning and tool orchestration
+- **Real Reverse Geocoding** — OpenStreetMap Nominatim API provides actual street addresses from GPS coordinates, with 30+ road type classifications (Interstate, Highway, Arterial, Residential, etc.)
+- **Publisher Confirms with Retry** — Critical crash events use RabbitMQ publisher confirms with 3x retry logic and exponential backoff to ensure no messages are lost
+- **Telematics Generator Integration** — Full simulation of 15 drivers on realistic Atlanta routes with real-time crash event generation via WebSocket dashboard
+- **24-Hour Weather History** — Environment agent analyzes weather conditions for the 24 hours prior to the accident, detecting significant events like heavy precipitation, snow, freeze/thaw cycles, and thunderstorms
+- **Complete FNOL Email Reports** — Automatically emails comprehensive claim reports to adjusters via Gmail SMTP, including weather, environment, services, and recommended actions
+- **SMS Notifications** — Twilio integration for driver wellness checks and status updates
+- **PostgreSQL Persistence** — FNOL reports persisted with full audit trail
 - **Enhanced Impact Classification** — Improved detection of ROLLOVER, SIDE, REAR, and FRONTAL impacts using accelerometer data
 
 ## Future Enhancements

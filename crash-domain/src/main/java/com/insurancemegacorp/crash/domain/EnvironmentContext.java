@@ -52,18 +52,18 @@ public record EnvironmentContext(
         String precipitation
     ) {}
 
-    @JsonClassDescription("Road surface conditions")
+    @JsonClassDescription("Road surface conditions assessed by LLM based on weather data")
     public record RoadConditions(
-        @JsonPropertyDescription("Surface condition: Dry, Wet, Icy, Snow-covered")
+        @JsonPropertyDescription("Surface condition: Dry, Wet, Icy, Snow-covered, Black Ice Risk, Slushy")
         String surfaceCondition,
 
-        @JsonPropertyDescription("Posted speed limit")
-        int speedLimit,
-
-        @JsonPropertyDescription("Number of lanes")
+        @JsonPropertyDescription("Number of lanes (estimated from road type)")
         int numberOfLanes,
 
         @JsonPropertyDescription("Whether there is road construction nearby")
-        boolean constructionZone
+        boolean constructionZone,
+
+        @JsonPropertyDescription("LLM reasoning for the surface condition assessment")
+        String surfaceAssessmentReason
     ) {}
 }

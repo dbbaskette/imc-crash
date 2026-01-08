@@ -15,6 +15,22 @@ openai:
 anthropic:
   api_key: ""
 
+# Twilio Configuration (for SMS communications)
+twilio:
+  account_sid: ""
+  auth_token: ""
+  from_number: ""  # Your Twilio phone number (e.g., +15551234567)
+
+# Gmail Configuration (for email notifications to adjusters)
+# To use Gmail SMTP, you need to:
+# 1. Enable 2-Factor Authentication on your Google account
+# 2. Generate an App Password at: https://myaccount.google.com/apppasswords
+# 3. Use that App Password below (not your regular Gmail password)
+gmail:
+  username: ""           # Your Gmail address (e.g., yourname@gmail.com)
+  app_password: ""       # Gmail App Password (16 characters, no spaces)
+  adjuster_email: ""     # Recipient email for FNOL reports (e.g., adjuster@company.com)
+
 # Service Ports (defaults shown - change if needed)
 ports:
   orchestrator: 8080

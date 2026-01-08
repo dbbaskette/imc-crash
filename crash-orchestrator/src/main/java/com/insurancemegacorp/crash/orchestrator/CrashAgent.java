@@ -193,11 +193,9 @@ public class CrashAgent {
     }
 
     /**
-     * Final Action: Compile the complete FNOL report.
-     * Achieves the goal when all specialist agent results are available.
+     * Action 6: Compile the FNOL report (not final - email follows).
      */
-    @AchievesGoal(description = "Generate complete First Notice of Loss report from accident telemetry")
-    @Action(description = "Compile all agent results into final FNOL report")
+    @Action(description = "Compile all agent results into FNOL report")
     public FNOLReport compileReport(
             AccidentEvent event,
             ImpactAnalysis impact,
@@ -274,4 +272,147 @@ public class CrashAgent {
             alerts
         );
     }
+
+    /**
+     * Final Action: Send FNOL email to adjuster and return the report.
+     * This is the goal - achieves the workflow by sending the compiled report via email.
+     */
+    @AchievesGoal(description = "Generate complete First Notice of Loss report and email to adjuster")
+    @Action(
+        description = "Email the compiled FNOL report to the claims adjuster and return the report",
+        toolGroups = {"communications-tools"}
+    )
+    public FNOLReport sendFnolToAdjuster(
+            FNOLReport report,
+            Ai ai
+    ) {
+        log.info("Sending FNOL email for claim: {}, severity: {}",
+                report.claimNumber(), report.impact().severity());
+
+        // Build the report content for the email
+        String reportContent = buildEmailReportContent(report);
+
+        // Call notifyAdjuster with the full FNOL report
+        try {
+            ai.withAutoLlm().createObject(
+                """
+                Call the notifyAdjuster tool to send the FNOL report email to the claims adjuster.
+
+                Use these parameters:
+                - claimNumber: "%s"
+                - severity: "%s"
+                - summary: "%s"
+
+                This will email the full FNOL report to the assigned adjuster.
+                Return confirmation of the notification.
+                """.formatted(
+                    report.claimNumber(),
+                    report.impact().severity().name(),
+                    reportContent.replace("\"", "\\\"").replace("\n", "\\n")
+                ),
+                EmailConfirmation.class
+            );
+            log.info("FNOL email sent for claim: {}", report.claimNumber());
+        } catch (Exception e) {
+            log.error("Failed to send FNOL email for claim {}: {}", report.claimNumber(), e.getMessage());
+        }
+
+        // Return the original report
+        return report;
+    }
+
+    private String buildEmailReportContent(FNOLReport report) {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("ACCIDENT DETAILS\n");
+        sb.append("================\n");
+        sb.append("Date/Time: ").append(report.event().eventTime()).append("\n");
+        sb.append("Location: ").append(report.event().currentStreet()).append("\n");
+        sb.append("Coordinates: ").append(report.event().latitude()).append(", ").append(report.event().longitude()).append("\n\n");
+
+        sb.append("IMPACT ANALYSIS\n");
+        sb.append("================\n");
+        sb.append("Severity: ").append(report.impact().severity()).append("\n");
+        sb.append("Impact Type: ").append(report.impact().impactType()).append("\n");
+        sb.append("G-Force: ").append(String.format("%.1f", report.event().gForce())).append("\n");
+        sb.append("Speed at Impact: ").append(String.format("%.0f", report.impact().estimatedSpeedAtImpact())).append(" mph");
+        sb.append(" (Limit: ").append(report.event().speedLimitMph()).append(" mph)\n");
+        if (report.impact().wasSpeeding()) {
+            sb.append("⚠ SPEEDING: Driver exceeded speed limit by ")
+              .append(String.format("%.0f", report.impact().estimatedSpeedAtImpact() - report.event().speedLimitMph()))
+              .append(" mph\n");
+        }
+        if (report.impact().airbagLikely()) {
+            sb.append("AIRBAG: Deployment likely\n");
+        }
+        sb.append("\n");
+
+        sb.append("DRIVER & VEHICLE\n");
+        sb.append("================\n");
+        sb.append("Driver: ").append(report.policy().driver().name()).append("\n");
+        sb.append("Phone: ").append(report.policy().driver().phone()).append("\n");
+        sb.append("Vehicle: ").append(report.policy().vehicle().year()).append(" ")
+          .append(report.policy().vehicle().make()).append(" ")
+          .append(report.policy().vehicle().model()).append("\n");
+        sb.append("VIN: ").append(report.policy().vehicle().vin()).append("\n\n");
+
+        sb.append("ENVIRONMENT & WEATHER\n");
+        sb.append("=====================\n");
+        sb.append("Location: ").append(report.environment().address()).append("\n");
+        sb.append("Road Type: ").append(report.environment().roadType()).append("\n");
+        if (report.environment().nearestIntersection() != null) {
+            sb.append("Nearest Intersection: ").append(report.environment().nearestIntersection()).append("\n");
+        }
+        sb.append("Lighting: ").append(report.environment().daylightStatus()).append("\n");
+        sb.append("\n");
+        sb.append("Weather:\n");
+        sb.append("  Conditions: ").append(report.environment().weather().conditions()).append("\n");
+        sb.append("  Temperature: ").append(String.format("%.1f", report.environment().weather().temperatureF())).append("°F\n");
+        sb.append("  Visibility: ").append(report.environment().weather().visibilityMiles()).append(" miles\n");
+        sb.append("  Wind Speed: ").append(String.format("%.1f", report.environment().weather().windSpeedMph())).append(" mph\n");
+        if (report.environment().weather().precipitation() != null) {
+            sb.append("  Precipitation: ").append(report.environment().weather().precipitation()).append("\n");
+        }
+        if (report.environment().prior24HourWeather() != null) {
+            sb.append("  Prior 24hr: ").append(report.environment().prior24HourWeather()).append("\n");
+        }
+        sb.append("\n");
+        sb.append("Road Conditions:\n");
+        sb.append("  Surface: ").append(report.environment().roadConditions().surfaceCondition()).append("\n");
+        if (report.environment().roadConditions().surfaceAssessmentReason() != null) {
+            sb.append("  Assessment: ").append(report.environment().roadConditions().surfaceAssessmentReason()).append("\n");
+        }
+        sb.append("  Lanes: ").append(report.environment().roadConditions().numberOfLanes()).append("\n");
+        if (report.environment().roadConditions().constructionZone()) {
+            sb.append("  ⚠ CONSTRUCTION ZONE\n");
+        }
+        sb.append("\n");
+
+        sb.append("RECOMMENDED ACTIONS\n");
+        sb.append("================\n");
+        for (String action : report.recommendedActions()) {
+            sb.append("- ").append(action).append("\n");
+        }
+        sb.append("\n");
+
+        if (!report.alerts().isEmpty()) {
+            sb.append("ALERTS\n");
+            sb.append("================\n");
+            for (String alert : report.alerts()) {
+                sb.append("- ").append(alert).append("\n");
+            }
+        }
+
+        return sb.toString();
+    }
+
+    /**
+     * Record for email confirmation result.
+     */
+    public record EmailConfirmation(
+        boolean sent,
+        String messageId,
+        String status,
+        String recipient
+    ) {}
 }

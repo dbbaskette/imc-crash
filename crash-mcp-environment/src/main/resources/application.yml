@@ -5,6 +5,13 @@ spring:
   application:
     name: crash-environment
   ai:
+    google:
+      genai:
+        api-key: ${GOOGLE_API_KEY:}
+        chat:
+          options:
+            model: gemini-2.5-flash
+            temperature: 0.1
     mcp:
       server:
         name: environment-agent
@@ -16,11 +23,12 @@ spring:
         instructions: |
           Environment Agent - Gathers environmental context for accident locations.
           Provides weather conditions, location details, and road conditions.
-          
+          Uses LLM to intelligently assess road surface conditions based on weather history.
+
           Available tools:
           - get_weather: Get weather at specific coordinates and time
           - reverse_geocode: Convert GPS coordinates to street address
-          - get_road_conditions: Get road surface and traffic conditions
+          - get_road_conditions: Get road surface and traffic conditions (LLM-assessed)
           - get_full_environment_context: Complete environmental report
         capabilities:
           tool: true

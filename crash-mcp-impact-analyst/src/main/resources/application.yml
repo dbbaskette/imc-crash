@@ -5,6 +5,13 @@ spring:
   application:
     name: crash-impact-analyst
   ai:
+    google:
+      genai:
+        api-key: ${GOOGLE_API_KEY:}
+        chat:
+          options:
+            model: gemini-2.5-flash
+            temperature: 0.1
     mcp:
       server:
         name: impact-analyst
@@ -19,9 +26,10 @@ spring:
         instructions: |
           Impact Analyst Agent - Analyzes vehicle telemetry data from safe driver apps
           to classify accident severity and impact type.
-          
+          Uses LLM to generate professional incident summaries.
+
           Available tools:
-          - analyze_impact: Full impact analysis from telemetry data
+          - analyze_impact: Full impact analysis from telemetry data with AI-generated narrative
           - is_accident_detected: Quick check if g-force exceeds accident threshold
         capabilities:
           tool: true

@@ -347,6 +347,10 @@ public class CrashAgent {
         }
         sb.append("\n");
 
+        sb.append("INCIDENT NARRATIVE\n");
+        sb.append("==================\n");
+        sb.append(report.impact().narrative()).append("\n\n");
+
         sb.append("DRIVER & VEHICLE\n");
         sb.append("================\n");
         sb.append("Driver: ").append(report.policy().driver().name()).append("\n");

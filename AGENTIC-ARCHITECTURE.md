@@ -245,6 +245,195 @@ Level 2 (needs everything):
   - compileReport
 ```
 
+### GOAP Decision Making Diagram
+
+This diagram shows how the GOAP planner makes decisions based on current world state:
+
+```mermaid
+stateDiagram-v2
+    direction TB
+
+    state "GOAP Planner" as planner {
+        [*] --> CheckGoal: Start Planning
+
+        state "Check Goal State" as CheckGoal {
+            state check_goal <<choice>>
+            check_goal: hasFNOLReport?
+        }
+
+        CheckGoal --> GoalAchieved: Yes
+        CheckGoal --> BackwardChain: No
+
+        state "Backward Chain from Goal" as BackwardChain {
+            state "Goal: FNOLReport" as goal
+            goal: Needs: sendFnolToAdjuster
+
+            state "sendFnolToAdjuster" as send
+            send: Precondition: FNOLReport
+            send: Effect: Goal Achieved + Email Sent
+
+            state "compileReport" as compile
+            compile: Preconditions: ImpactAnalysis,
+            compile: EnvironmentContext, PolicyInfo,
+            compile: NearbyServices, CommunicationsStatus
+            compile: Effect: FNOLReport
+
+            state "Level 1 Actions" as level1 {
+                state "findServices" as find
+                find: Precondition: ImpactAnalysis
+                find: Effect: NearbyServices
+
+                state "initiateComms" as comms
+                comms: Preconditions: PolicyInfo, ImpactAnalysis
+                comms: Effect: CommunicationsStatus
+            }
+
+            state "Level 0 Actions" as level0 {
+                state "analyzeImpact" as impact
+                impact: Precondition: AccidentEvent
+                impact: Effect: ImpactAnalysis
+
+                state "gatherEnvironment" as env
+                env: Precondition: AccidentEvent
+                env: Effect: EnvironmentContext
+
+                state "lookupPolicy" as policy
+                policy: Precondition: AccidentEvent
+                policy: Effect: PolicyInfo
+            }
+        }
+
+        BackwardChain --> ExecutePlan
+
+        state "Execute Plan" as ExecutePlan {
+            state "Check: hasAccidentEvent?" as has_event
+            has_event --> RunLevel0: Yes
+            has_event --> WaitForInput: No
+
+            state "Run Level 0 (Parallel)" as RunLevel0
+            RunLevel0: analyzeImpact || gatherEnvironment || lookupPolicy
+
+            RunLevel0 --> CheckLevel0
+
+            state "Check Level 0 Complete" as CheckLevel0
+            CheckLevel0: hasImpactAnalysis? hasPolicyInfo?
+            CheckLevel0: hasEnvironmentContext?
+
+            CheckLevel0 --> RunLevel1: All Available
+
+            state "Run Level 1 (Parallel)" as RunLevel1
+            RunLevel1: findServices || initiateComms
+
+            RunLevel1 --> CheckLevel1
+
+            state "Check Level 1 Complete" as CheckLevel1
+            CheckLevel1: hasNearbyServices?
+            CheckLevel1: hasCommunicationsStatus?
+
+            CheckLevel1 --> RunCompile: All Available
+
+            state "Run compileReport" as RunCompile
+            RunCompile --> RunSend
+
+            state "Run sendFnolToAdjuster" as RunSend
+            RunSend: Email FNOL to adjuster
+        }
+
+        ExecutePlan --> GoalAchieved
+
+        state "Goal Achieved" as GoalAchieved
+        GoalAchieved: hasFNOLReport = true
+        GoalAchieved: Email sent to adjuster
+    }
+
+    GoalAchieved --> [*]
+```
+
+### World State Transitions
+
+```mermaid
+flowchart LR
+    subgraph Initial["Initial State"]
+        S0["hasAccidentEvent: ✅<br/>hasImpactAnalysis: ❌<br/>hasEnvironmentContext: ❌<br/>hasPolicyInfo: ❌<br/>hasNearbyServices: ❌<br/>hasCommunicationsStatus: ❌<br/>hasFNOLReport: ❌"]
+    end
+
+    subgraph AfterL0["After Level 0"]
+        S1["hasAccidentEvent: ✅<br/>hasImpactAnalysis: ✅<br/>hasEnvironmentContext: ✅<br/>hasPolicyInfo: ✅<br/>hasNearbyServices: ❌<br/>hasCommunicationsStatus: ❌<br/>hasFNOLReport: ❌"]
+    end
+
+    subgraph AfterL1["After Level 1"]
+        S2["hasAccidentEvent: ✅<br/>hasImpactAnalysis: ✅<br/>hasEnvironmentContext: ✅<br/>hasPolicyInfo: ✅<br/>hasNearbyServices: ✅<br/>hasCommunicationsStatus: ✅<br/>hasFNOLReport: ❌"]
+    end
+
+    subgraph GoalState["Goal State"]
+        S3["hasAccidentEvent: ✅<br/>hasImpactAnalysis: ✅<br/>hasEnvironmentContext: ✅<br/>hasPolicyInfo: ✅<br/>hasNearbyServices: ✅<br/>hasCommunicationsStatus: ✅<br/>hasFNOLReport: ✅"]
+    end
+
+    S0 --> |"analyzeImpact ∥<br/>gatherEnvironment ∥<br/>lookupPolicy"| S1
+    S1 --> |"findServices ∥<br/>initiateComms"| S2
+    S2 --> |"compileReport →<br/>sendFnolToAdjuster"| S3
+
+    style S3 fill:#90EE90
+```
+
+### Action Preconditions & Effects
+
+```mermaid
+flowchart TB
+    subgraph Actions["GOAP Action Registry"]
+        direction TB
+
+        subgraph A1["analyzeImpact"]
+            A1P["PRE: AccidentEvent"]
+            A1E["EFF: ImpactAnalysis"]
+            A1P --> A1E
+        end
+
+        subgraph A2["gatherEnvironment"]
+            A2P["PRE: AccidentEvent"]
+            A2E["EFF: EnvironmentContext"]
+            A2P --> A2E
+        end
+
+        subgraph A3["lookupPolicy"]
+            A3P["PRE: AccidentEvent"]
+            A3E["EFF: PolicyInfo"]
+            A3P --> A3E
+        end
+
+        subgraph A4["findServices"]
+            A4P["PRE: AccidentEvent +<br/>ImpactAnalysis"]
+            A4E["EFF: NearbyServices"]
+            A4P --> A4E
+        end
+
+        subgraph A5["initiateComms"]
+            A5P["PRE: AccidentEvent +<br/>PolicyInfo + ImpactAnalysis"]
+            A5E["EFF: CommunicationsStatus"]
+            A5P --> A5E
+        end
+
+        subgraph A6["compileReport"]
+            A6P["PRE: All of above"]
+            A6E["EFF: FNOLReport"]
+            A6P --> A6E
+        end
+
+        subgraph A7["sendFnolToAdjuster"]
+            A7P["PRE: FNOLReport"]
+            A7E["EFF: GOAL ✅"]
+            A7P --> A7E
+        end
+    end
+
+    subgraph Legend["Legend"]
+        LP["PRE = Preconditions<br/>(what must exist)"]
+        LE["EFF = Effects<br/>(what gets produced)"]
+    end
+
+    style A7E fill:#90EE90
+```
+
 ### Visual Execution Graph
 
 ```mermaid

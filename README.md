@@ -28,38 +28,36 @@ Each agent is an independent microservice that contributes its expertise:
 
 ## Architecture
 
-```
-┌─────────────────┐     ┌──────────────┐     ┌─────────────────────────────────┐
-│  TELEMATICS-GEN │────▶│   RABBITMQ   │────▶│      CRASH ORCHESTRATOR         │
-│     (:8087)     │     │   (:5672)    │     │          (:8080)                │
-│                 │     │              │     │                                 │
-│  Simulates 15   │     │  telematics_ │     │  • Consumes crash events        │
-│  drivers with   │     │  exchange    │     │  • GOAP planning for FNOL       │
-│  realistic GPS  │     │  (fanout)    │     │  • Persists to PostgreSQL       │
-│  routes & crash │     │              │     │  • Emails FNOL to adjusters     │
-│  events         │     │  Publisher   │     │                                 │
-│                 │     │  Confirms    │     │                                 │
-└─────────────────┘     └──────────────┘     └────────────┬────────────────────┘
-                                                          │
-                                    MCP Client Connections (HTTP/SSE)
-                                                          │
-          ┌───────────────┬───────────────┬───────────────┼───────────────┐
-          │               │               │               │               │
-          ▼               ▼               ▼               ▼               ▼
-    ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
-    │ IMPACT   │   │ENVIRON-  │   │ POLICY   │   │ SERVICES │   │  COMMS   │
-    │ ANALYST  │   │  MENT    │   │  AGENT   │   │  AGENT   │   │  AGENT   │
-    │  :8081   │   │  :8082   │   │  :8083   │   │  :8084   │   │  :8085   │
-    │          │   │          │   │          │   │          │   │          │
-    │ Severity │   │ Nominatim│   │ Coverage │   │ Nearby   │   │ Twilio   │
-    │ Impact   │   │ Open-    │   │ Driver   │   │ Tow/Body │   │ Gmail    │
-    │ Type     │   │ Meteo    │   │ Vehicle  │   │ Hospital │   │ SMS/Email│
-    └──────────┘   └──────────┘   └──────────┘   └──────────┘   └──────────┘
-           \            |              |              |            /
-            \           |              |              |           /
-             +----------+--------------+--------------+----------+
-                                   THE HIVE
-                         (Independent Specialist Agents)
+```mermaid
+flowchart TB
+    subgraph Input["Event Source"]
+        TG["TELEMATICS-GEN<br/>:8087<br/><br/>Simulates 15 drivers<br/>with realistic GPS<br/>routes & crash events"]
+    end
+
+    subgraph Messaging["Message Broker"]
+        RMQ["RABBITMQ<br/>:5672<br/><br/>telematics_exchange<br/>(fanout)<br/>Publisher Confirms"]
+    end
+
+    subgraph Orchestration["Orchestrator"]
+        ORCH["CRASH ORCHESTRATOR<br/>:8080<br/><br/>• Consumes crash events<br/>• GOAP planning for FNOL<br/>• Persists to PostgreSQL<br/>• Emails FNOL to adjusters"]
+    end
+
+    TG --> RMQ --> ORCH
+
+    subgraph Hive["THE HIVE (Independent Specialist Agents)"]
+        direction TB
+        IA["IMPACT ANALYST<br/>:8081<br/><br/>Severity<br/>Impact Type"]
+        ENV["ENVIRONMENT<br/>:8082<br/><br/>Nominatim<br/>Open-Meteo<br/>LLM Assessment"]
+        POL["POLICY<br/>:8083<br/><br/>Coverage<br/>Driver<br/>Vehicle"]
+        SVC["SERVICES<br/>:8084<br/><br/>Nearby Tow<br/>Body Shop<br/>Hospital"]
+        COM["COMMUNICATIONS<br/>:8085<br/><br/>Twilio SMS<br/>Gmail Email"]
+    end
+
+    ORCH <--> |"MCP/HTTP"| IA
+    ORCH <--> |"MCP/HTTP"| ENV
+    ORCH <--> |"MCP/HTTP"| POL
+    ORCH <--> |"MCP/HTTP"| SVC
+    ORCH <--> |"MCP/HTTP"| COM
 ```
 
 **Key Technologies:**

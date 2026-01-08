@@ -247,52 +247,49 @@ Level 2 (needs everything):
 
 ### Visual Execution Graph
 
-```
-                              AccidentEvent
-                                    │
-              ┌─────────────────────┼─────────────────────┐
-              │                     │                     │
-              ▼                     ▼                     ▼
-       ┌──────────────┐      ┌──────────────┐      ┌──────────────┐
-       │ analyzeImpact│      │gatherEnviron │      │ lookupPolicy │
-       │              │      │    ment      │      │              │
-       │ MCP: Impact  │      │ MCP: Environ │      │ MCP: Policy  │
-       │   Analyst    │      │  (Nominatim) │      │              │
-       └──────┬───────┘      └──────┬───────┘      └──────┬───────┘
-              │                     │                     │
-              │  ImpactAnalysis     │ EnvironmentContext  │  PolicyInfo
-              │       │             │        │            │     │
-              ▼       │             │        │            ▼     │
-       ┌──────────────┐             │        │     ┌──────────────┐
-       │ findServices │             │        │     │initiateComms │
-       │              │             │        │     │              │
-       │ MCP: Services│             │        │     │ MCP: Comms   │
-       │              │             │        │     │ (Twilio SMS) │
-       └──────┬───────┘             │        │     └──────┬───────┘
-              │                     │        │            │
-              │  NearbyServices     │        │            │ CommunicationsStatus
-              │       │             │        │            │     │
-              ▼       ▼             ▼        ▼            ▼     ▼
-            ┌───────────────────────────────────────────────────────┐
-            │                    compileReport                       │
-            │                                                        │
-            │  Aggregates all data into comprehensive FNOLReport     │
-            └───────────────────────────┬───────────────────────────┘
-                                        │
-                                        ▼
-                                   FNOLReport
-                                        │
-                                        ▼
-                            ┌───────────────────────┐
-                            │  sendFnolToAdjuster   │
-                            │                       │
-                            │  MCP: Communications  │
-                            │  (Gmail SMTP Email)   │
-                            └───────────────────────┘
-                                        │
-                                        ▼
-                               Email sent to adjuster
-                               FNOL persisted to DB
+```mermaid
+flowchart TB
+    AE["AccidentEvent"]
+
+    subgraph Level0["Level 0 - Parallel Execution"]
+        direction LR
+        AI["analyzeImpact<br/><br/>MCP: Impact Analyst"]
+        GE["gatherEnvironment<br/><br/>MCP: Environment<br/>(Nominatim, Open-Meteo)"]
+        LP["lookupPolicy<br/><br/>MCP: Policy"]
+    end
+
+    AE --> AI
+    AE --> GE
+    AE --> LP
+
+    AI --> |"ImpactAnalysis"| FS
+    AI --> |"ImpactAnalysis"| IC
+    LP --> |"PolicyInfo"| IC
+
+    subgraph Level1["Level 1 - Dependent Execution"]
+        direction LR
+        FS["findServices<br/><br/>MCP: Services"]
+        IC["initiateComms<br/><br/>MCP: Communications<br/>(Twilio SMS)"]
+    end
+
+    GE --> |"EnvironmentContext"| CR
+    FS --> |"NearbyServices"| CR
+    IC --> |"CommunicationsStatus"| CR
+    AI --> CR
+    LP --> CR
+
+    subgraph Level2["Level 2 - Goal Achievement"]
+        CR["compileReport<br/><br/>Aggregates all data into<br/>comprehensive FNOLReport"]
+    end
+
+    CR --> FNOL["FNOLReport"]
+
+    subgraph Level3["Level 3 - Final Action"]
+        SEND["sendFnolToAdjuster<br/><br/>MCP: Communications<br/>(Gmail SMTP Email)"]
+    end
+
+    FNOL --> SEND
+    SEND --> OUT["Email sent to adjuster<br/>FNOL persisted to DB"]
 ```
 
 ### Data Flow Summary
@@ -457,20 +454,17 @@ CRASH uses multiple specialized agents coordinated by an orchestrator:
 
 Agents communicate using MCP, a standardized protocol for LLM tool use:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      CRASH Orchestrator                         │
-│                      (Embabel Agent)                            │
-└───────┬──────────┬──────────┬──────────┬──────────┬────────────┘
-        │          │          │          │          │
-        │ MCP/SSE  │ MCP/SSE  │ MCP/SSE  │ MCP/SSE  │ MCP/SSE
-        │          │          │          │          │
-        ▼          ▼          ▼          ▼          ▼
-    ┌───────┐  ┌───────┐  ┌───────┐  ┌───────┐  ┌───────┐
-    │Impact │  │Environ│  │Policy │  │Services│ │ Comms │
-    │Analyst│  │ment   │  │       │  │        │ │       │
-    │ :8081 │  │ :8082 │  │ :8083 │  │ :8084  │ │ :8085 │
-    └───────┘  └───────┘  └───────┘  └───────┘  └───────┘
+```mermaid
+flowchart TB
+    subgraph Orchestrator["CRASH Orchestrator (Embabel Agent)"]
+        ORCH["Agent Core"]
+    end
+
+    ORCH <--> |"MCP/SSE"| IA["Impact Analyst<br/>:8081"]
+    ORCH <--> |"MCP/SSE"| ENV["Environment<br/>:8082"]
+    ORCH <--> |"MCP/SSE"| POL["Policy<br/>:8083"]
+    ORCH <--> |"MCP/SSE"| SVC["Services<br/>:8084"]
+    ORCH <--> |"MCP/SSE"| COM["Comms<br/>:8085"]
 ```
 
 ---
@@ -542,44 +536,62 @@ Each provides domain-specific tools:
 
 ## Execution Flow
 
-```
-1. TELEMATICS-GEN simulates vehicle telemetry (15 drivers on Atlanta routes)
-   │
-   ▼
-2. CRASH EVENT detected (g-force > 2.5) with PUBLISHER CONFIRMS + RETRY
-   │
-   ▼
-3. MESSAGE published to RabbitMQ (telematics_exchange, fanout)
-   │
-   ▼
-4. CRASH SINK consumes message, deserializes to TelemetryMessage
-   │
-   ▼
-5. MAPPER transforms to AccidentEvent (with real GPS coordinates)
-   │
-   ▼
-6. FNOL SERVICE invokes CrashAgent with AccidentEvent
-   │
-   ▼
-7. EMBABEL PLANNER (GOAP) analyzes goal and builds execution plan
-   │
-   ├── Parallel: analyzeImpact, gatherEnvironment, lookupPolicy
-   │   │         └── Nominatim reverse geocoding (real addresses)
-   │   │         └── Open-Meteo weather + 24hr history
-   │   ▼
-   ├── Parallel: findServices, initiateComms (after dependencies met)
-   │   │         └── Twilio SMS to driver
-   │   ▼
-   └── compileReport (when all inputs available)
-   │
-   ▼
-8. FNOL REPORT generated with complete claim details
-   │
-   ├── sendFnolToAdjuster → Gmail email to claims team
-   │
-   ├── Persisted to PostgreSQL (fnol_entities table)
-   │
-   └── Published to fnol_reports queue
+```mermaid
+flowchart TB
+    subgraph Step1["1. Event Generation"]
+        TG["TELEMATICS-GEN<br/>simulates vehicle telemetry<br/>(15 drivers on Atlanta routes)"]
+    end
+
+    subgraph Step2["2. Crash Detection"]
+        CRASH["CRASH EVENT detected<br/>(g-force > 2.5)<br/>with PUBLISHER CONFIRMS + RETRY"]
+    end
+
+    subgraph Step3["3. Message Delivery"]
+        RMQ["MESSAGE published to RabbitMQ<br/>(telematics_exchange, fanout)"]
+    end
+
+    subgraph Step4["4. Message Consumption"]
+        SINK["CRASH SINK consumes message<br/>deserializes to TelemetryMessage"]
+    end
+
+    subgraph Step5["5. Data Transformation"]
+        MAP["MAPPER transforms to AccidentEvent<br/>(with real GPS coordinates)"]
+    end
+
+    subgraph Step6["6. Agent Invocation"]
+        FNOL_SVC["FNOL SERVICE invokes CrashAgent<br/>with AccidentEvent"]
+    end
+
+    subgraph Step7["7. GOAP Planning & Execution"]
+        direction TB
+        PLAN["EMBABEL PLANNER (GOAP)<br/>analyzes goal and builds execution plan"]
+
+        subgraph Parallel1["Parallel Execution"]
+            AI2["analyzeImpact"]
+            GE2["gatherEnvironment<br/>(Nominatim + Open-Meteo)"]
+            LP2["lookupPolicy"]
+        end
+
+        subgraph Parallel2["Dependent Execution"]
+            FS2["findServices"]
+            IC2["initiateComms<br/>(Twilio SMS)"]
+        end
+
+        COMPILE["compileReport<br/>(when all inputs available)"]
+    end
+
+    subgraph Step8["8. Output"]
+        REPORT["FNOL REPORT generated"]
+        EMAIL["sendFnolToAdjuster<br/>(Gmail email)"]
+        DB["Persisted to PostgreSQL<br/>(fnol_entities table)"]
+        QUEUE["Published to<br/>fnol_reports queue"]
+    end
+
+    TG --> CRASH --> RMQ --> SINK --> MAP --> FNOL_SVC --> PLAN
+    PLAN --> Parallel1 --> Parallel2 --> COMPILE --> REPORT
+    REPORT --> EMAIL
+    REPORT --> DB
+    REPORT --> QUEUE
 ```
 
 ## MCP (Model Context Protocol)

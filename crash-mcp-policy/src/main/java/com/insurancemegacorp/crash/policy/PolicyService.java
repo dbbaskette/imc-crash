@@ -4,8 +4,8 @@ import com.insurancemegacorp.crash.domain.PolicyInfo;
 import com.insurancemegacorp.crash.domain.PolicyInfo.Driver;
 import com.insurancemegacorp.crash.domain.PolicyInfo.Policy;
 import com.insurancemegacorp.crash.domain.PolicyInfo.Vehicle;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
+import org.springaicommunity.mcp.annotation.McpTool;
+import org.springaicommunity.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -34,10 +34,10 @@ public class PolicyService {
     /**
      * Look up policy details by policy ID.
      */
-    @Tool(description = "Look up insurance policy details including coverage types, " +
+    @McpTool(description = "Look up insurance policy details including coverage types, " +
                         "deductible, and available benefits.")
     public Policy lookupPolicy(
-            @ToolParam(description = "Insurance policy ID") 
+            @McpToolParam(description = "Insurance policy ID") 
             int policyId
     ) {
         SimulatedPolicy sim = POLICIES.getOrDefault(policyId, 
@@ -60,13 +60,13 @@ public class PolicyService {
     /**
      * Get driver profile by driver ID.
      */
-    @Tool(description = "Get driver profile including contact information, " +
+    @McpTool(description = "Get driver profile including contact information, " +
                         "risk score, and emergency contacts.")
     public Driver getDriverProfile(
-            @ToolParam(description = "Driver ID") 
+            @McpToolParam(description = "Driver ID") 
             int driverId,
             
-            @ToolParam(description = "Associated policy ID") 
+            @McpToolParam(description = "Associated policy ID") 
             int policyId
     ) {
         SimulatedPolicy sim = POLICIES.getOrDefault(policyId,
@@ -88,16 +88,16 @@ public class PolicyService {
     /**
      * Get vehicle details by vehicle ID or VIN.
      */
-    @Tool(description = "Get vehicle details including make, model, year, " +
+    @McpTool(description = "Get vehicle details including make, model, year, " +
                         "and estimated value.")
     public Vehicle getVehicleDetails(
-            @ToolParam(description = "Vehicle ID") 
+            @McpToolParam(description = "Vehicle ID") 
             int vehicleId,
             
-            @ToolParam(description = "Vehicle Identification Number") 
+            @McpToolParam(description = "Vehicle Identification Number") 
             String vin,
             
-            @ToolParam(description = "Associated policy ID") 
+            @McpToolParam(description = "Associated policy ID") 
             int policyId
     ) {
         SimulatedPolicy sim = POLICIES.getOrDefault(policyId,
@@ -123,19 +123,19 @@ public class PolicyService {
     /**
      * Get complete policy information in one call.
      */
-    @Tool(description = "Get complete policy information including policy details, " +
+    @McpTool(description = "Get complete policy information including policy details, " +
                         "driver profile, and vehicle information.")
     public PolicyInfo getFullPolicyInfo(
-            @ToolParam(description = "Insurance policy ID") 
+            @McpToolParam(description = "Insurance policy ID") 
             int policyId,
             
-            @ToolParam(description = "Driver ID") 
+            @McpToolParam(description = "Driver ID") 
             int driverId,
             
-            @ToolParam(description = "Vehicle ID") 
+            @McpToolParam(description = "Vehicle ID") 
             int vehicleId,
             
-            @ToolParam(description = "Vehicle Identification Number") 
+            @McpToolParam(description = "Vehicle Identification Number") 
             String vin
     ) {
         Policy policy = lookupPolicy(policyId);

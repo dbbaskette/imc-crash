@@ -1,4 +1,4 @@
-package com.insurancemegacorp.crashsink;
+package com.insurancemegacorp.crash.orchestrator;
 
 import com.embabel.agent.api.invocation.AgentInvocation;
 import com.embabel.agent.core.AgentPlatform;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
  * Service that orchestrates FNOL generation using the Embabel CrashAgent.
  *
  * This service wraps the AgentPlatform invocation and provides a clean interface
- * for the CrashSink to generate FNOL reports from AccidentEvents.
+ * for the OrchestratorSink to generate FNOL reports from AccidentEvents.
  */
 @Service
 public class FnolService {

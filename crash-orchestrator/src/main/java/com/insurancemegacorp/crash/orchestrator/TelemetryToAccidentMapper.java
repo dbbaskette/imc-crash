@@ -1,4 +1,4 @@
-package com.insurancemegacorp.crashsink;
+package com.insurancemegacorp.crash.orchestrator;
 
 import com.insurancemegacorp.crash.domain.AccidentEvent;
 import org.springframework.stereotype.Component;

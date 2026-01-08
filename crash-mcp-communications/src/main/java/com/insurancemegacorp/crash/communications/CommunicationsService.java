@@ -3,8 +3,8 @@ package com.insurancemegacorp.crash.communications;
 import com.insurancemegacorp.crash.domain.CommunicationsStatus;
 import com.insurancemegacorp.crash.domain.CommunicationsStatus.CommunicationLog;
 import com.insurancemegacorp.crash.domain.CommunicationsStatus.DriverOutreach;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
+import org.springaicommunity.mcp.annotation.McpTool;
+import org.springaicommunity.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -26,16 +26,16 @@ public class CommunicationsService {
     /**
      * Send an SMS to the driver checking on their welfare.
      */
-    @Tool(description = "Send an SMS message to the driver. " +
+    @McpTool(description = "Send an SMS message to the driver. " +
                         "Returns confirmation of delivery status.")
     public SmsResult sendSms(
-            @ToolParam(description = "Driver's phone number") 
+            @McpToolParam(description = "Driver's phone number") 
             String phoneNumber,
             
-            @ToolParam(description = "Message content") 
+            @McpToolParam(description = "Message content") 
             String message,
             
-            @ToolParam(description = "Claim reference for tracking") 
+            @McpToolParam(description = "Claim reference for tracking") 
             String claimReference
     ) {
         // Simulate SMS sending - in production, call Twilio API
@@ -63,18 +63,18 @@ public class CommunicationsService {
     /**
      * Send a push notification to the driver's mobile app.
      */
-    @Tool(description = "Send a push notification through the safe driver app.")
+    @McpTool(description = "Send a push notification through the safe driver app.")
     public PushResult sendPushNotification(
-            @ToolParam(description = "Driver ID for push routing") 
+            @McpToolParam(description = "Driver ID for push routing") 
             int driverId,
             
-            @ToolParam(description = "Notification title") 
+            @McpToolParam(description = "Notification title") 
             String title,
             
-            @ToolParam(description = "Notification body") 
+            @McpToolParam(description = "Notification body") 
             String body,
             
-            @ToolParam(description = "Claim reference for tracking") 
+            @McpToolParam(description = "Claim reference for tracking") 
             String claimReference
     ) {
         Instant sentAt = Instant.now();
@@ -98,15 +98,15 @@ public class CommunicationsService {
     /**
      * Notify a claims adjuster about a new claim.
      */
-    @Tool(description = "Notify a claims adjuster about a new or updated claim.")
+    @McpTool(description = "Notify a claims adjuster about a new or updated claim.")
     public AdjusterNotification notifyAdjuster(
-            @ToolParam(description = "Claim number") 
+            @McpToolParam(description = "Claim number") 
             String claimNumber,
             
-            @ToolParam(description = "Accident severity: MINOR, MODERATE, SEVERE") 
+            @McpToolParam(description = "Accident severity: MINOR, MODERATE, SEVERE") 
             String severity,
             
-            @ToolParam(description = "Brief summary of the incident") 
+            @McpToolParam(description = "Brief summary of the incident") 
             String summary
     ) {
         Instant notifiedAt = Instant.now();
@@ -139,18 +139,18 @@ public class CommunicationsService {
     /**
      * Dispatch roadside assistance.
      */
-    @Tool(description = "Dispatch roadside assistance to the accident location.")
+    @McpTool(description = "Dispatch roadside assistance to the accident location.")
     public RoadsideDispatch dispatchRoadsideAssistance(
-            @ToolParam(description = "Latitude of accident") 
+            @McpToolParam(description = "Latitude of accident") 
             double latitude,
             
-            @ToolParam(description = "Longitude of accident") 
+            @McpToolParam(description = "Longitude of accident") 
             double longitude,
             
-            @ToolParam(description = "Driver's phone number for callback") 
+            @McpToolParam(description = "Driver's phone number for callback") 
             String driverPhone,
             
-            @ToolParam(description = "Claim reference") 
+            @McpToolParam(description = "Claim reference") 
             String claimReference
     ) {
         Instant dispatchedAt = Instant.now();
@@ -177,21 +177,21 @@ public class CommunicationsService {
     /**
      * Log a communication event.
      */
-    @Tool(description = "Log a communication event for audit trail.")
+    @McpTool(description = "Log a communication event for audit trail.")
     public boolean logCommunicationEvent(
-            @ToolParam(description = "Claim reference") 
+            @McpToolParam(description = "Claim reference") 
             String claimReference,
             
-            @ToolParam(description = "Type: SMS, PUSH, EMAIL, CALL, INTERNAL") 
+            @McpToolParam(description = "Type: SMS, PUSH, EMAIL, CALL, INTERNAL") 
             String type,
             
-            @ToolParam(description = "Direction: OUTBOUND or INBOUND") 
+            @McpToolParam(description = "Direction: OUTBOUND or INBOUND") 
             String direction,
             
-            @ToolParam(description = "Other party (phone, email, or name)") 
+            @McpToolParam(description = "Other party (phone, email, or name)") 
             String party,
             
-            @ToolParam(description = "Summary of communication") 
+            @McpToolParam(description = "Summary of communication") 
             String summary
     ) {
         logCommunication(claimReference, new CommunicationLog(
@@ -208,19 +208,19 @@ public class CommunicationsService {
     /**
      * Get full communication status for a claim.
      */
-    @Tool(description = "Get the complete communication status for a claim, " +
+    @McpTool(description = "Get the complete communication status for a claim, " +
                         "including driver outreach status and all logged communications.")
     public CommunicationsStatus getFullCommunicationsStatus(
-            @ToolParam(description = "Claim reference") 
+            @McpToolParam(description = "Claim reference") 
             String claimReference,
             
-            @ToolParam(description = "Driver name") 
+            @McpToolParam(description = "Driver name") 
             String driverName,
             
-            @ToolParam(description = "Driver phone number") 
+            @McpToolParam(description = "Driver phone number") 
             String driverPhone,
             
-            @ToolParam(description = "Accident severity: MINOR, MODERATE, SEVERE") 
+            @McpToolParam(description = "Accident severity: MINOR, MODERATE, SEVERE") 
             String severity
     ) {
         // Generate standard wellness check message

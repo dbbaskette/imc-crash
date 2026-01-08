@@ -29,7 +29,10 @@ public record EnvironmentContext(
     List<String> contributingFactors,
 
     @JsonPropertyDescription("Lighting conditions: Daylight, Dusk, Dawn, Night")
-    String daylightStatus
+    String daylightStatus,
+
+    @JsonPropertyDescription("Weather summary for the 24 hours prior to accident")
+    String prior24HourWeather
 ) {
     @JsonClassDescription("Weather conditions at a specific location and time")
     public record WeatherConditions(

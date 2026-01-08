@@ -1,4 +1,4 @@
-package com.insurancemegacorp.crashsink.config;
+package com.insurancemegacorp.crash.orchestrator.config;
 
 import com.embabel.agent.core.ToolGroup;
 import com.embabel.agent.core.ToolGroupDescription;
@@ -18,6 +18,11 @@ import java.util.Set;
  *
  * This bridges Spring AI MCP clients with Embabel's tool resolution system,
  * allowing @Action methods to access MCP tools via toolGroups parameter.
+ *
+ * IMPORTANT: The second parameter to ToolGroupDescription.Companion.invoke(description, role)
+ * sets the ROLE which must match the toolGroups value in @Action annotations.
+ * For example, @Action(toolGroups = {"impact-analyst-tools"}) requires
+ * ToolGroupDescription with role "impact-analyst-tools".
  */
 @Configuration
 public class McpToolGroupsConfiguration {
@@ -45,14 +50,14 @@ public class McpToolGroupsConfiguration {
             ToolGroupDescription.Companion.invoke(
                 "Analyzes vehicle telemetry data to classify accident severity and impact type. " +
                 "Provides tools to analyze g-force, accelerometer data, and determine if accident threshold is met.",
-                "impact-analyst"
+                "impact-analyst-tools"  // role - must match @Action toolGroups value
             ),
-            "Impact Analyst MCP Server",
-            "impact-analyst-tools",
+            "impact-analyst-tools",      // name
+            "CRASH-MCP",                  // provider
             Set.of(ToolGroupPermission.HOST_ACCESS),
             mcpSyncClients,
-            toolCallback -> {
-                String toolName = toolCallback.getToolDefinition().name();
+            tool -> {
+                String toolName = tool.getToolDefinition().name();
                 return toolName.equals("analyzeImpact") ||
                        toolName.equals("isAccidentDetected");
             }
@@ -65,14 +70,14 @@ public class McpToolGroupsConfiguration {
             ToolGroupDescription.Companion.invoke(
                 "Gathers environmental context for accident locations including weather, " +
                 "location details, and road conditions.",
-                "environment-agent"
+                "environment-tools"
             ),
-            "Environment Agent MCP Server",
             "environment-tools",
+            "CRASH-MCP",
             Set.of(ToolGroupPermission.INTERNET_ACCESS, ToolGroupPermission.HOST_ACCESS),
             mcpSyncClients,
-            toolCallback -> {
-                String toolName = toolCallback.getToolDefinition().name();
+            tool -> {
+                String toolName = tool.getToolDefinition().name();
                 return toolName.equals("getWeather") ||
                        toolName.equals("reverseGeocode") ||
                        toolName.equals("getRoadConditions") ||
@@ -87,14 +92,14 @@ public class McpToolGroupsConfiguration {
             ToolGroupDescription.Companion.invoke(
                 "Retrieves insurance policy, driver, and vehicle information. " +
                 "Provides access to coverage details, driver profiles, and vehicle data.",
-                "policy-agent"
+                "policy-tools"
             ),
-            "Policy Agent MCP Server",
             "policy-tools",
+            "CRASH-MCP",
             Set.of(ToolGroupPermission.HOST_ACCESS),
             mcpSyncClients,
-            toolCallback -> {
-                String toolName = toolCallback.getToolDefinition().name();
+            tool -> {
+                String toolName = tool.getToolDefinition().name();
                 return toolName.equals("lookupPolicy") ||
                        toolName.equals("getDriverProfile") ||
                        toolName.equals("getVehicleDetails") ||
@@ -109,14 +114,14 @@ public class McpToolGroupsConfiguration {
             ToolGroupDescription.Companion.invoke(
                 "Finds nearby services relevant to accident response including tow trucks, " +
                 "body shops, medical facilities, and rental cars.",
-                "services-agent"
+                "services-tools"
             ),
-            "Services Agent MCP Server",
             "services-tools",
+            "CRASH-MCP",
             Set.of(ToolGroupPermission.INTERNET_ACCESS, ToolGroupPermission.HOST_ACCESS),
             mcpSyncClients,
-            toolCallback -> {
-                String toolName = toolCallback.getToolDefinition().name();
+            tool -> {
+                String toolName = tool.getToolDefinition().name();
                 return toolName.equals("findBodyShops") ||
                        toolName.equals("findTowServices") ||
                        toolName.equals("findMedicalFacilities") ||
@@ -132,14 +137,14 @@ public class McpToolGroupsConfiguration {
             ToolGroupDescription.Companion.invoke(
                 "Handles driver and adjuster communications including SMS, push notifications, " +
                 "and roadside assistance dispatch.",
-                "communications-agent"
+                "communications-tools"
             ),
-            "Communications Agent MCP Server",
             "communications-tools",
+            "CRASH-MCP",
             Set.of(ToolGroupPermission.INTERNET_ACCESS, ToolGroupPermission.HOST_ACCESS),
             mcpSyncClients,
-            toolCallback -> {
-                String toolName = toolCallback.getToolDefinition().name();
+            tool -> {
+                String toolName = tool.getToolDefinition().name();
                 return toolName.equals("sendSms") ||
                        toolName.equals("sendPushNotification") ||
                        toolName.equals("notifyAdjuster") ||

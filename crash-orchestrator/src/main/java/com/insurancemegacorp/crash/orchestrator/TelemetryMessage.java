@@ -1,4 +1,4 @@
-package com.insurancemegacorp.crashsink;
+package com.insurancemegacorp.crash.orchestrator;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;

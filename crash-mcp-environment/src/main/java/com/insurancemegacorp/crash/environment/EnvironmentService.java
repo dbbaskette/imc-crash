@@ -7,8 +7,8 @@ import com.insurancemegacorp.crash.domain.EnvironmentContext.RoadConditions;
 import com.insurancemegacorp.crash.domain.EnvironmentContext.WeatherConditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
+import org.springaicommunity.mcp.annotation.McpTool;
+import org.springaicommunity.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -68,16 +68,16 @@ public class EnvironmentService {
     /**
      * Get weather conditions at a specific location and time using Open-Meteo API.
      */
-    @Tool(description = "Get weather conditions at the accident location and time. " +
+    @McpTool(description = "Get weather conditions at the accident location and time. " +
                         "Returns temperature, visibility, wind speed, and precipitation status.")
     public WeatherConditions getWeather(
-            @ToolParam(description = "Latitude coordinate")
+            @McpToolParam(description = "Latitude coordinate")
             double latitude,
 
-            @ToolParam(description = "Longitude coordinate")
+            @McpToolParam(description = "Longitude coordinate")
             double longitude,
 
-            @ToolParam(description = "ISO 8601 timestamp of the event")
+            @McpToolParam(description = "ISO 8601 timestamp of the event")
             String timestamp
     ) {
         try {
@@ -100,12 +100,12 @@ public class EnvironmentService {
                     latitude, longitude, date, date
                 );
             } else {
-                // Use forecast API for recent/current data
+                // Use forecast API for recent/current data with 1 day history
                 url = String.format(
                     "https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f" +
-                    "&hourly=temperature_2m,weather_code,wind_speed_10m,visibility" +
+                    "&hourly=temperature_2m,weather_code,wind_speed_10m,visibility,precipitation" +
                     "&temperature_unit=fahrenheit&wind_speed_unit=mph" +
-                    "&past_days=7&forecast_days=1",
+                    "&past_days=1&forecast_days=1",
                     latitude, longitude
                 );
             }
@@ -180,16 +180,148 @@ public class EnvironmentService {
     }
 
     /**
+     * Analyze weather conditions for the 24 hours prior to the accident.
+     * Returns summary of significant weather that may have affected road conditions.
+     */
+    @McpTool(description = "Analyze weather for the 24 hours before the accident. " +
+                        "Returns summary of precipitation, temperature extremes, and adverse conditions.")
+    public String getPrior24HourWeather(
+            @McpToolParam(description = "Latitude coordinate")
+            double latitude,
+
+            @McpToolParam(description = "Longitude coordinate")
+            double longitude,
+
+            @McpToolParam(description = "ISO 8601 timestamp of the event")
+            String timestamp
+    ) {
+        try {
+            Instant eventTime = Instant.parse(timestamp);
+            ZonedDateTime zdt = eventTime.atZone(ZoneId.of("America/New_York"));
+            LocalDate date = zdt.toLocalDate();
+
+            // Fetch weather with past_days=1 to get yesterday's data
+            String url = String.format(
+                "https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f" +
+                "&hourly=temperature_2m,weather_code,precipitation" +
+                "&temperature_unit=fahrenheit" +
+                "&past_days=1&forecast_days=1",
+                latitude, longitude
+            );
+
+            log.info("Fetching 24hr weather history from Open-Meteo: lat={}, lon={}", latitude, longitude);
+            String response = restTemplate.getForObject(url, String.class);
+            JsonNode root = objectMapper.readTree(response);
+            JsonNode hourly = root.path("hourly");
+            JsonNode times = hourly.path("time");
+
+            // Find the accident time index
+            String targetPrefix = date + "T" + String.format("%02d", zdt.getHour());
+            int accidentIndex = -1;
+            for (int i = 0; i < times.size(); i++) {
+                if (times.get(i).asText().startsWith(targetPrefix)) {
+                    accidentIndex = i;
+                    break;
+                }
+            }
+
+            if (accidentIndex == -1 || accidentIndex < 24) {
+                return "Prior 24-hour weather data unavailable";
+            }
+
+            // Analyze the 24 hours before the accident
+            int startIndex = accidentIndex - 24;
+            int endIndex = accidentIndex;
+
+            double totalPrecip = 0.0;
+            int snowHours = 0;
+            int rainHours = 0;
+            int freezingHours = 0;
+            double minTemp = 999;
+            double maxTemp = -999;
+            boolean hadThunderstorm = false;
+
+            for (int i = startIndex; i < endIndex; i++) {
+                double precip = hourly.path("precipitation").get(i).asDouble(0);
+                int weatherCode = hourly.path("weather_code").get(i).asInt(0);
+                double temp = hourly.path("temperature_2m").get(i).asDouble();
+
+                totalPrecip += precip;
+                minTemp = Math.min(minTemp, temp);
+                maxTemp = Math.max(maxTemp, temp);
+
+                // Count hours with significant weather
+                if (weatherCode >= 71 && weatherCode <= 86) {
+                    snowHours++;
+                } else if (weatherCode >= 51 && weatherCode <= 67) {
+                    rainHours++;
+                }
+
+                if (temp <= 32) {
+                    freezingHours++;
+                }
+
+                if (weatherCode >= 95) {
+                    hadThunderstorm = true;
+                }
+            }
+
+            // Build summary
+            List<String> summary = new ArrayList<>();
+
+            if (totalPrecip > 0.5) {
+                summary.add(String.format("Heavy precipitation: %.1f inches", totalPrecip));
+            } else if (totalPrecip > 0.1) {
+                summary.add(String.format("Light precipitation: %.1f inches", totalPrecip));
+            }
+
+            if (snowHours > 0) {
+                summary.add(String.format("Snow for %d hours", snowHours));
+            }
+
+            if (rainHours > 4) {
+                summary.add(String.format("Rain for %d hours", rainHours));
+            }
+
+            if (freezingHours > 6) {
+                summary.add(String.format("Freezing temperatures for %d hours", freezingHours));
+            }
+
+            if (hadThunderstorm) {
+                summary.add("Thunderstorm activity");
+            }
+
+            if (minTemp < 32 && maxTemp > 32) {
+                summary.add(String.format("Temperature fluctuation across freezing point (%d°F to %d°F)",
+                    Math.round(minTemp), Math.round(maxTemp)));
+            }
+
+            if (summary.isEmpty()) {
+                return String.format("Clear conditions for prior 24 hours (Temp: %d°F to %d°F)",
+                    Math.round(minTemp), Math.round(maxTemp));
+            }
+
+            String result = "Prior 24 hours: " + String.join("; ", summary);
+            log.info("24hr weather summary: {}", result);
+            return result;
+
+        } catch (Exception e) {
+            log.error("Failed to fetch 24hr weather history: {}", e.getMessage());
+            return "Prior 24-hour weather data unavailable";
+        }
+    }
+
+    /**
      * Reverse geocode coordinates to get a street address.
      * Uses simulated data - could integrate with Nominatim or Google Geocoding.
      */
-    @Tool(description = "Convert GPS coordinates to a street address. " +
+    @McpTool(description = "Convert GPS coordinates to a street address. " +
                         "Returns full address, road type, and nearest intersection.")
     public LocationDetails reverseGeocode(
-            @ToolParam(description = "Latitude coordinate")
+            @McpToolParam(description = "Latitude coordinate")
             double latitude,
 
-            @ToolParam(description = "Longitude coordinate")
+            @McpToolParam(description = "Longitude coordinate")
             double longitude
     ) {
         // For now, simulated geocoding
@@ -213,16 +345,16 @@ public class EnvironmentService {
      * Get road conditions at a location.
      * Infers conditions based on weather data.
      */
-    @Tool(description = "Get road surface conditions at the accident location. " +
+    @McpTool(description = "Get road surface conditions at the accident location. " +
                         "Returns surface condition, speed limit, lane count, and construction status.")
     public RoadConditions getRoadConditions(
-            @ToolParam(description = "Latitude coordinate")
+            @McpToolParam(description = "Latitude coordinate")
             double latitude,
 
-            @ToolParam(description = "Longitude coordinate")
+            @McpToolParam(description = "Longitude coordinate")
             double longitude,
 
-            @ToolParam(description = "Current weather conditions for inference")
+            @McpToolParam(description = "Current weather conditions for inference")
             String weatherCondition
     ) {
         // Infer road surface from weather
@@ -250,21 +382,22 @@ public class EnvironmentService {
     /**
      * Get complete environmental context combining all data sources.
      */
-    @Tool(description = "Get complete environmental context for an accident. " +
+    @McpTool(description = "Get complete environmental context for an accident. " +
                         "Combines weather, location, and road conditions into a comprehensive report.")
     public EnvironmentContext getFullEnvironmentContext(
-            @ToolParam(description = "Latitude coordinate")
+            @McpToolParam(description = "Latitude coordinate")
             double latitude,
 
-            @ToolParam(description = "Longitude coordinate")
+            @McpToolParam(description = "Longitude coordinate")
             double longitude,
 
-            @ToolParam(description = "ISO 8601 timestamp of the event")
+            @McpToolParam(description = "ISO 8601 timestamp of the event")
             String timestamp
     ) {
         LocationDetails location = reverseGeocode(latitude, longitude);
         WeatherConditions weather = getWeather(latitude, longitude, timestamp);
         RoadConditions road = getRoadConditions(latitude, longitude, weather.conditions());
+        String prior24hr = getPrior24HourWeather(latitude, longitude, timestamp);
 
         // Determine daylight status
         Instant eventTime = Instant.parse(timestamp);
@@ -305,8 +438,22 @@ public class EnvironmentService {
             factors.add("Active precipitation (" + weather.precipitation() + ")");
         }
 
-        log.info("Environment context generated: weather={}, road={}, factors={}",
-                weather.conditions(), road.surfaceCondition(), factors.size());
+        // Add prior 24-hour weather to contributing factors if significant
+        if (prior24hr != null && !prior24hr.contains("unavailable") && !prior24hr.contains("Clear conditions")) {
+            // Extract key concerns from 24hr summary
+            if (prior24hr.contains("Heavy precipitation") || prior24hr.contains("Snow for")) {
+                factors.add("Recent adverse weather in past 24 hours may have left residual hazards");
+            } else if (prior24hr.contains("Light precipitation") && road.surfaceCondition().equals("Wet")) {
+                factors.add("Prior precipitation may have contributed to wet road surface");
+            }
+            if (prior24hr.contains("Temperature fluctuation across freezing")) {
+                factors.add("Recent freeze/thaw cycles may have created ice patches");
+            }
+        }
+
+        log.info("Environment context generated: weather={}, road={}, factors={}, 24hr={}",
+                weather.conditions(), road.surfaceCondition(), factors.size(),
+                prior24hr != null ? prior24hr.substring(0, Math.min(50, prior24hr.length())) : "none");
 
         return new EnvironmentContext(
             location.address(),
@@ -315,7 +462,8 @@ public class EnvironmentService {
             weather,
             road,
             factors,
-            daylight
+            daylight,
+            prior24hr
         );
     }
 

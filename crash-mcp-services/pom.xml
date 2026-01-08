@@ -24,6 +24,10 @@
             <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.springaicommunity</groupId>
+            <artifactId>mcp-annotations</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.insurancemegacorp</groupId>
             <artifactId>crash-domain</artifactId>
         </dependency>

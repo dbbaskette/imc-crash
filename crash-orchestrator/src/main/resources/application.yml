@@ -1,95 +1,152 @@
-server:
-  port: 8080
-
 spring:
   application:
-    name: crash-orchestrator
-  
+    name: crash-rabbitmq-sink
+
+  # Spring Cloud Stream configuration
+  cloud:
+    function:
+      definition: processTelemetry
+    stream:
+      bindings:
+        # Input: Vehicle accident events from telemetry exchange
+        processTelemetry-in-0:
+          destination: ${TELEMETRY_INPUT_DESTINATION:telematics_exchange}
+          group: ${TELEMETRY_INPUT_GROUP:crash-sink-group}
+          consumer:
+            concurrency: ${CONSUMER_CONCURRENCY:1}
+
+        # Output 0: vehicle_events queue (original format for JDBC Sink compatibility)
+        processTelemetry-out-0:
+          destination: ${VEHICLE_EVENTS_DESTINATION:vehicle_events}
+
+        # Output 1: fnol_reports queue (enriched reports for claims systems)
+        processTelemetry-out-1:
+          destination: ${FNOL_REPORTS_DESTINATION:fnol_reports}
+
+      rabbit:
+        bindings:
+          processTelemetry-in-0:
+            consumer:
+              exchangeType: fanout
+              bindingRoutingKey: "#"
+
+          processTelemetry-out-0:
+            producer:
+              exchangeType: topic
+              routingKeyExpression: "headers.containsKey('severity') ? 'vehicle.accident.' + headers['severity'].toString().toLowerCase() : 'vehicle.accident.unknown'"
+
+          processTelemetry-out-1:
+            producer:
+              exchangeType: topic
+              routingKeyExpression: "headers.containsKey('severity') ? 'fnol.' + headers['severity'].toString().toLowerCase() : 'fnol.unknown'"
+
+  # JPA/Database configuration
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/crash}
+    username: ${DATABASE_USERNAME:crash}
+    password: ${DATABASE_PASSWORD:crash}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # Spring AI configuration
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY}
+      api-key: ${OPENAI_API_KEY:}
+      base-url: https://api.openai.com/v1
       chat:
         options:
-          model: gpt-5-nano
-          temperature: 0.7
-    
-    # MCP Client configuration to connect to all specialist agents
+          model: ${OPENAI_MODEL:gpt-5-nano}
+          temperature: ${OPENAI_TEMPERATURE:0.3}
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:}
+      chat:
+        options:
+          model: ${ANTHROPIC_MODEL:claude-3-5-sonnet-20241022}
+          temperature: ${ANTHROPIC_TEMPERATURE:0.3}
+        request-timeout: 60s
     mcp:
       client:
         enabled: true
-        toolcallback:
-          enabled: true
         type: SYNC
         request-timeout: 30s
+        toolcallback:
+          enabled: true
         streamable-http:
           connections:
-            # Impact Analyst Agent
             impact-analyst:
-              url: ${IMPACT_ANALYST_URL:http://localhost:8081}
+              url: ${MCP_IMPACT_ANALYST_URL:http://localhost:8081}
               endpoint: /mcp
-            # Environment Agent
             environment:
-              url: ${ENVIRONMENT_URL:http://localhost:8082}
+              url: ${MCP_ENVIRONMENT_URL:http://localhost:8082}
               endpoint: /mcp
-            # Policy Agent
             policy:
-              url: ${POLICY_URL:http://localhost:8083}
+              url: ${MCP_POLICY_URL:http://localhost:8083}
               endpoint: /mcp
-            # Services Agent
             services:
-              url: ${SERVICES_URL:http://localhost:8084}
+              url: ${MCP_SERVICES_URL:http://localhost:8084}
               endpoint: /mcp
-            # Communications Agent
             communications:
-              url: ${COMMUNICATIONS_URL:http://localhost:8085}
+              url: ${MCP_COMMUNICATIONS_URL:http://localhost:8085}
               endpoint: /mcp
 
-# Embabel configuration
+# Embabel agent configuration
 embabel:
   models:
-    default-llm: gpt-5-nano
-    llms:
-      best: gpt-5-nano
-      cheapest: gpt-5-nano
+    default-llm: claude-sonnet-4-5
   agent:
-    logging:
-      prompts: true
-      responses: true
-      planning: true
+    platform:
+      scanning:
+        packages: com.embabel.agent,com.insurancemegacorp.crashsink
 
-# Actuator
+# Server configuration
+server:
+  port: ${PORT:8086}
+
+# Actuator/Management endpoints
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
+# Logging
 logging:
   level:
-    com.insurancemegacorp.crash: DEBUG
-    com.embabel: DEBUG
-    org.springframework.ai.mcp: DEBUG
+    com.insurancemegacorp: ${LOG_LEVEL:INFO}
+    com.embabel: INFO
+    org.springframework.ai: DEBUG
+    org.springframework.ai.openai: TRACE
+    org.springframework.web.client: DEBUG
+    org.springframework.cloud.stream: INFO
 
 ---
-# Shell profile for interactive CLI
+# Local/Docker profile
 spring:
   config:
     activate:
-      on-profile: shell
-  main:
-    web-application-type: none
+      on-profile: local
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
 
 ---
-# Demo profile with simulated delays for visual effect
+# Cloud Foundry profile
 spring:
   config:
     activate:
-      on-profile: demo
-
-crash:
-  demo:
-    simulate-latency: true
-    latency-ms: 500
+      on-profile: cloud
+  # CF will auto-configure RabbitMQ and PostgreSQL from bound services

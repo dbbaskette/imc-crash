@@ -1,4 +1,4 @@
-package com.insurancemegacorp.crashsink;
+package com.insurancemegacorp.crash.orchestrator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -24,8 +24,8 @@ import java.util.function.Function;
  * Phase 5: Output queue publishing (via Spring Cloud Stream output binding)
  */
 @Component
-public class CrashSink {
-    private static final Logger log = LoggerFactory.getLogger(CrashSink.class);
+public class OrchestratorSink {
+    private static final Logger log = LoggerFactory.getLogger(OrchestratorSink.class);
     private final ObjectMapper mapper;
 
     {
@@ -37,9 +37,9 @@ public class CrashSink {
     private final FnolService fnolService;
     private final FnolPersistenceService persistenceService;
 
-    public CrashSink(TelemetryToAccidentMapper telemetryMapper,
-                     FnolService fnolService,
-                     FnolPersistenceService persistenceService) {
+    public OrchestratorSink(TelemetryToAccidentMapper telemetryMapper,
+                            FnolService fnolService,
+                            FnolPersistenceService persistenceService) {
         this.telemetryMapper = telemetryMapper;
         this.fnolService = fnolService;
         this.persistenceService = persistenceService;

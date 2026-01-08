@@ -1,4 +1,4 @@
-package com.insurancemegacorp.crashsink;
+package com.insurancemegacorp.crash.orchestrator;
 
 import jakarta.persistence.*;
 import java.time.Instant;

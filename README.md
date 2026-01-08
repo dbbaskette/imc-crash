@@ -21,7 +21,7 @@ Each agent is an independent microservice that contributes its expertise:
 | Agent | Responsibility |
 |-------|----------------|
 | **Impact Analyst** | Analyzes telemetry to classify severity (MINOR/MODERATE/SEVERE) and impact type |
-| **Environment** | Gathers weather, road conditions, and location context |
+| **Environment** | Gathers weather (current + prior 24 hours), road conditions, and location context |
 | **Policy** | Retrieves insurance coverage, driver profile, and vehicle details |
 | **Services** | Locates nearby body shops, tow services, hospitals based on severity |
 | **Communications** | Handles driver outreach, SMS notifications, and adjuster alerts |
@@ -54,10 +54,11 @@ Each agent is an independent microservice that contributes its expertise:
 ```
 
 **Key Technologies:**
-- **Embabel Agent Framework 0.3.1** — Goal-based planning orchestrator using GOAP (full Java support)
-- **Spring AI 1.1.0** — Model Context Protocol for agent communication via SSE
-- **Spring Boot 3.4** — Microservice foundation
-- **OpenAI GPT-5-nano** — Fast, cost-effective LLM for reasoning and planning
+- **Embabel Agent Framework 0.3.2** — Goal-based planning orchestrator using GOAP (full Java support)
+- **Spring AI 1.1.2** — Model Context Protocol for agent communication via SSE
+- **Spring Boot 3.4.1** — Microservice foundation
+- **Claude Sonnet 4.5** — High-quality LLM for reasoning and planning (via Anthropic API)
+- **Open-Meteo API** — Real weather data including 24-hour historical analysis
 
 ## Quick Start
 
@@ -66,7 +67,7 @@ Each agent is an independent microservice that contributes its expertise:
 - Java 21+
 - Maven 3.9+
 - Docker & Docker Compose
-- OpenAI API Key
+- Anthropic API Key (Claude)
 
 ### 1. Clone and Build
 
@@ -86,7 +87,7 @@ cp vars.yaml.template vars.yaml
 
 **Option B: Environment variable**
 ```bash
-export OPENAI_API_KEY=sk-...
+export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ### 3. Start the Hive
@@ -236,14 +237,21 @@ public RepairEstimate estimateRepairCost(
 3. Add MCP client connection to orchestrator
 4. Create orchestrator actions that use the new tools
 
+## Recent Enhancements
+
+- **24-Hour Weather History** — Environment agent now analyzes weather conditions for the 24 hours prior to the accident, detecting significant events like heavy precipitation, snow, freeze/thaw cycles, and thunderstorms that may have affected road conditions
+- **Claude Sonnet 4.5 Integration** — Switched from OpenAI to Anthropic Claude for more reliable LLM processing
+- **PostgreSQL Persistence** — FNOL reports are now persisted to a PostgreSQL database
+- **RabbitMQ Integration** — Telematics events are streamed via RabbitMQ for real-time processing
+- **Enhanced Impact Classification** — Improved detection of ROLLOVER, SIDE, REAR, and FRONTAL impacts using accelerometer data
+
 ## Future Enhancements
 
-- Real API integrations (weather, places, SMS)
-- Database persistence for claims
 - Real-time claims dashboard UI
 - Fraud detection agent
 - Fleet manager agent
 - Kubernetes deployment
+- Integration with real SMS/notification services
 
 ## License
 

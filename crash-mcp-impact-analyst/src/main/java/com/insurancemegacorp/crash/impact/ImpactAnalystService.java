@@ -3,8 +3,8 @@ package com.insurancemegacorp.crash.impact;
 import com.insurancemegacorp.crash.domain.ImpactAnalysis;
 import com.insurancemegacorp.crash.domain.ImpactAnalysis.ImpactType;
 import com.insurancemegacorp.crash.domain.ImpactAnalysis.Severity;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
+import org.springaicommunity.mcp.annotation.McpTool;
+import org.springaicommunity.mcp.annotation.McpToolParam;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -30,26 +30,26 @@ public class ImpactAnalystService {
     /**
      * Analyzes accident telemetry to determine severity and impact type.
      */
-    @Tool(description = "Analyze accident telemetry data to classify impact severity and type. " +
+    @McpTool(description = "Analyze accident telemetry data to classify impact severity and type. " +
                         "Returns a complete impact analysis including severity level, impact type, " +
                         "whether airbags likely deployed, and a narrative description.")
     public ImpactAnalysis analyzeImpact(
-            @ToolParam(description = "G-force measurement from accelerometer") 
+            @McpToolParam(description = "G-force measurement from accelerometer") 
             double gForce,
             
-            @ToolParam(description = "Vehicle speed in mph at time of event") 
+            @McpToolParam(description = "Vehicle speed in mph at time of event") 
             double speedMph,
             
-            @ToolParam(description = "Posted speed limit in mph") 
+            @McpToolParam(description = "Posted speed limit in mph") 
             int speedLimitMph,
             
-            @ToolParam(description = "Accelerometer X-axis reading (longitudinal/front-back: negative=deceleration, positive=pushed forward)")
+            @McpToolParam(description = "Accelerometer X-axis reading (longitudinal/front-back: negative=deceleration, positive=pushed forward)")
             double accelerometerX,
 
-            @ToolParam(description = "Accelerometer Y-axis reading (lateral/left-right: side impacts)")
+            @McpToolParam(description = "Accelerometer Y-axis reading (lateral/left-right: side impacts)")
             double accelerometerY,
 
-            @ToolParam(description = "Accelerometer Z-axis reading (vertical/up-down: rollovers)")
+            @McpToolParam(description = "Accelerometer Z-axis reading (vertical/up-down: rollovers)")
             double accelerometerZ
     ) {
         // Classify severity
@@ -85,12 +85,12 @@ public class ImpactAnalystService {
     /**
      * Quick severity check without full analysis.
      */
-    @Tool(description = "Quick check to determine if an event meets the threshold for accident detection")
+    @McpTool(description = "Quick check to determine if an event meets the threshold for accident detection")
     public boolean isAccidentDetected(
-            @ToolParam(description = "G-force measurement from accelerometer") 
+            @McpToolParam(description = "G-force measurement from accelerometer") 
             double gForce,
             
-            @ToolParam(description = "Threshold g-force value for accident detection (default 2.5)") 
+            @McpToolParam(description = "Threshold g-force value for accident detection (default 2.5)") 
             Double threshold
     ) {
         double effectiveThreshold = threshold != null ? threshold : 2.5;

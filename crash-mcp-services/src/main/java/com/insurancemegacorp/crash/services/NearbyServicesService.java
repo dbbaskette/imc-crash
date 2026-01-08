@@ -2,8 +2,8 @@ package com.insurancemegacorp.crash.services;
 
 import com.insurancemegacorp.crash.domain.NearbyServices;
 import com.insurancemegacorp.crash.domain.NearbyServices.ServiceLocation;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
+import org.springaicommunity.mcp.annotation.McpTool;
+import org.springaicommunity.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -22,16 +22,16 @@ public class NearbyServicesService {
     /**
      * Find nearby auto body shops.
      */
-    @Tool(description = "Find nearby auto body shops for vehicle repair. " +
+    @McpTool(description = "Find nearby auto body shops for vehicle repair. " +
                         "Returns list of shops with distance, ratings, and contact info.")
     public List<ServiceLocation> findBodyShops(
-            @ToolParam(description = "Latitude coordinate of accident") 
+            @McpToolParam(description = "Latitude coordinate of accident") 
             double latitude,
             
-            @ToolParam(description = "Longitude coordinate of accident") 
+            @McpToolParam(description = "Longitude coordinate of accident") 
             double longitude,
             
-            @ToolParam(description = "Search radius in miles") 
+            @McpToolParam(description = "Search radius in miles") 
             double radiusMiles
     ) {
         // Simulated data - in production, call Google Places API
@@ -67,16 +67,16 @@ public class NearbyServicesService {
     /**
      * Find nearby tow truck services.
      */
-    @Tool(description = "Find nearby tow truck services. " +
+    @McpTool(description = "Find nearby tow truck services. " +
                         "Returns list of tow services with ETA and contact info.")
     public List<ServiceLocation> findTowServices(
-            @ToolParam(description = "Latitude coordinate of accident") 
+            @McpToolParam(description = "Latitude coordinate of accident") 
             double latitude,
             
-            @ToolParam(description = "Longitude coordinate of accident") 
+            @McpToolParam(description = "Longitude coordinate of accident") 
             double longitude,
             
-            @ToolParam(description = "Search radius in miles") 
+            @McpToolParam(description = "Search radius in miles") 
             double radiusMiles
     ) {
         List<ServiceLocation> towServices = new ArrayList<>();
@@ -109,16 +109,16 @@ public class NearbyServicesService {
     /**
      * Find nearby hospitals and urgent care facilities.
      */
-    @Tool(description = "Find nearby hospitals and urgent care facilities. " +
+    @McpTool(description = "Find nearby hospitals and urgent care facilities. " +
                         "Returns list with trauma center status and contact info.")
     public List<ServiceLocation> findMedicalFacilities(
-            @ToolParam(description = "Latitude coordinate of accident") 
+            @McpToolParam(description = "Latitude coordinate of accident") 
             double latitude,
             
-            @ToolParam(description = "Longitude coordinate of accident") 
+            @McpToolParam(description = "Longitude coordinate of accident") 
             double longitude,
             
-            @ToolParam(description = "Search radius in miles") 
+            @McpToolParam(description = "Search radius in miles") 
             double radiusMiles
     ) {
         List<ServiceLocation> medical = new ArrayList<>();
@@ -150,12 +150,12 @@ public class NearbyServicesService {
     /**
      * Find nearby rental car locations.
      */
-    @Tool(description = "Find nearby rental car locations for temporary transportation.")
+    @McpTool(description = "Find nearby rental car locations for temporary transportation.")
     public List<ServiceLocation> findRentalCars(
-            @ToolParam(description = "Latitude coordinate of accident") 
+            @McpToolParam(description = "Latitude coordinate of accident") 
             double latitude,
             
-            @ToolParam(description = "Longitude coordinate of accident") 
+            @McpToolParam(description = "Longitude coordinate of accident") 
             double longitude
     ) {
         List<ServiceLocation> rentals = new ArrayList<>();
@@ -187,19 +187,19 @@ public class NearbyServicesService {
     /**
      * Get all nearby services based on accident severity.
      */
-    @Tool(description = "Get all relevant nearby services based on accident severity. " +
+    @McpTool(description = "Get all relevant nearby services based on accident severity. " +
                         "Includes body shops, tow services, hospitals (if severe), and rental cars.")
     public NearbyServices getAllNearbyServices(
-            @ToolParam(description = "Latitude coordinate of accident") 
+            @McpToolParam(description = "Latitude coordinate of accident") 
             double latitude,
             
-            @ToolParam(description = "Longitude coordinate of accident") 
+            @McpToolParam(description = "Longitude coordinate of accident") 
             double longitude,
             
-            @ToolParam(description = "Accident severity: MINOR, MODERATE, or SEVERE") 
+            @McpToolParam(description = "Accident severity: MINOR, MODERATE, or SEVERE") 
             String severity,
             
-            @ToolParam(description = "Search radius in miles") 
+            @McpToolParam(description = "Search radius in miles") 
             double radiusMiles
     ) {
         List<ServiceLocation> bodyShops = findBodyShops(latitude, longitude, radiusMiles);

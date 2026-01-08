@@ -373,7 +373,7 @@ flowchart LR
     S1 --> |"findServices ∥<br/>initiateComms"| S2
     S2 --> |"compileReport →<br/>sendFnolToAdjuster"| S3
 
-    style S3 fill:#90EE90
+    style S3 fill:#228B22,color:#fff
 ```
 
 ### Action Preconditions & Effects
@@ -431,7 +431,7 @@ flowchart TB
         LE["EFF = Effects<br/>(what gets produced)"]
     end
 
-    style A7E fill:#90EE90
+    style A7E fill:#228B22,color:#fff
 ```
 
 ### Visual Execution Graph

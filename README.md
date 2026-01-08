@@ -184,9 +184,9 @@ flowchart TB
     end
 
     FNOL --> SEND
-    SEND --> OUT["✅ GOAL ACHIEVED<br/>Email sent to adjuster<br/>FNOL persisted to DB"]
+    SEND --> OUT["GOAL ACHIEVED<br/>Email sent to adjuster<br/>FNOL persisted to DB"]
 
-    style OUT fill:#90EE90
+    style OUT fill:#228B22,color:#fff
 ```
 
 ### Severity-Based Behavior

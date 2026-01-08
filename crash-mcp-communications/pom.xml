@@ -31,6 +31,17 @@
             <groupId>com.insurancemegacorp</groupId>
             <artifactId>crash-domain</artifactId>
         </dependency>
+        <!-- Twilio SDK for SMS -->
+        <dependency>
+            <groupId>com.twilio.sdk</groupId>
+            <artifactId>twilio</artifactId>
+            <version>10.1.0</version>
+        </dependency>
+        <!-- Spring Mail for Gmail SMTP -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
     </dependencies>
     <build>
         <plugins>

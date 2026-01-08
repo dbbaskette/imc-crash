@@ -69,12 +69,20 @@ spring:
         options:
           model: ${ANTHROPIC_MODEL:claude-3-5-sonnet-20241022}
           temperature: ${ANTHROPIC_TEMPERATURE:0.3}
-        request-timeout: 60s
+        connection-timeout: 30s
+        read-timeout: 120s
+    google:
+      genai:
+        api-key: ${GOOGLE_API_KEY:}
+        chat:
+          options:
+            model: ${GOOGLE_MODEL:gemini-2.5-flash}
+            temperature: ${GOOGLE_TEMPERATURE:0.3}
     mcp:
       client:
         enabled: true
         type: SYNC
-        request-timeout: 30s
+        request-timeout: 120s
         toolcallback:
           enabled: true
         streamable-http:
@@ -98,7 +106,7 @@ spring:
 # Embabel agent configuration
 embabel:
   models:
-    default-llm: claude-sonnet-4-5
+    default-llm: gemini-2.5-flash
   agent:
     platform:
       scanning:

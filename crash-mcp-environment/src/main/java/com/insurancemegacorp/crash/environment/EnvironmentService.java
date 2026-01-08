@@ -313,7 +313,7 @@ public class EnvironmentService {
 
     /**
      * Reverse geocode coordinates to get a street address.
-     * Uses simulated data - could integrate with Nominatim or Google Geocoding.
+     * Uses OpenStreetMap Nominatim API (free, no API key required).
      */
     @McpTool(description = "Convert GPS coordinates to a street address. " +
                         "Returns full address, road type, and nearest intersection.")
@@ -324,21 +324,211 @@ public class EnvironmentService {
             @McpToolParam(description = "Longitude coordinate")
             double longitude
     ) {
-        // For now, simulated geocoding
-        // Could integrate with OpenStreetMap Nominatim (free, no API key)
-        String[] streets = {"Main Street", "Oak Avenue", "Maple Drive", "Highway 7", "Industrial Blvd"};
-        String[] cities = {"Leesburg", "Ashburn", "Sterling", "Herndon", "Reston"};
-        String[] roadTypes = {"Urban arterial", "Highway", "Residential", "Commercial"};
+        try {
+            // Use OpenStreetMap Nominatim API for real reverse geocoding
+            String url = String.format(
+                "https://nominatim.openstreetmap.org/reverse?lat=%f&lon=%f&format=json&addressdetails=1",
+                latitude, longitude
+            );
 
-        int streetNum = 100 + random.nextInt(9900);
-        String street = streets[random.nextInt(streets.length)];
-        String city = cities[random.nextInt(cities.length)];
-        String roadType = roadTypes[random.nextInt(roadTypes.length)];
+            log.info("Reverse geocoding via Nominatim: lat={}, lon={}", latitude, longitude);
 
-        String address = String.format("%d %s, %s, VA 20176", streetNum, street, city);
-        String intersection = street + " & " + streets[(random.nextInt(streets.length))];
+            // Nominatim requires a User-Agent header
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.set("User-Agent", "CRASH-Insurance-Claims-System/1.0");
+            org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>(headers);
 
-        return new LocationDetails(address, roadType, intersection);
+            org.springframework.http.ResponseEntity<String> response = restTemplate.exchange(
+                url, org.springframework.http.HttpMethod.GET, entity, String.class
+            );
+
+            JsonNode root = objectMapper.readTree(response.getBody());
+
+            // Extract the display name (full address)
+            String displayName = root.path("display_name").asText("Unknown location");
+
+            // Extract address components
+            JsonNode address = root.path("address");
+            String houseNumber = address.path("house_number").asText("");
+            String road = address.path("road").asText(address.path("street").asText(""));
+            String city = address.path("city").asText(
+                address.path("town").asText(
+                    address.path("village").asText(
+                        address.path("municipality").asText(""))));
+            String state = address.path("state").asText("");
+            String postcode = address.path("postcode").asText("");
+
+            // Build a clean address
+            StringBuilder cleanAddress = new StringBuilder();
+            if (!houseNumber.isEmpty()) {
+                cleanAddress.append(houseNumber).append(" ");
+            }
+            if (!road.isEmpty()) {
+                cleanAddress.append(road);
+            }
+            if (!city.isEmpty()) {
+                if (cleanAddress.length() > 0) cleanAddress.append(", ");
+                cleanAddress.append(city);
+            }
+            if (!state.isEmpty()) {
+                if (cleanAddress.length() > 0) cleanAddress.append(", ");
+                cleanAddress.append(state);
+            }
+            if (!postcode.isEmpty()) {
+                if (cleanAddress.length() > 0) cleanAddress.append(" ");
+                cleanAddress.append(postcode);
+            }
+
+            String finalAddress = cleanAddress.length() > 0 ? cleanAddress.toString() : displayName;
+
+            // Determine road type from OSM class/type
+            String osmClass = root.path("class").asText("");
+            String osmType = root.path("type").asText("");
+            String roadType = determineRoadType(osmClass, osmType, road);
+
+            // For intersection, use the road name (we don't have intersection data from Nominatim)
+            String intersection = road.isEmpty() ? null : "Near " + road;
+
+            log.info("Geocode result: address={}, roadType={}", finalAddress, roadType);
+
+            return new LocationDetails(finalAddress, roadType, intersection);
+
+        } catch (Exception e) {
+            log.error("Failed to reverse geocode via Nominatim: {}", e.getMessage());
+            return getFallbackLocation(latitude, longitude);
+        }
+    }
+
+    /**
+     * Determine road type from OSM classification.
+     * OSM highway types: https://wiki.openstreetmap.org/wiki/Key:highway
+     */
+    private String determineRoadType(String osmClass, String osmType, String roadName) {
+        // Check road name for hints first
+        String roadLower = roadName.toLowerCase();
+        if (roadLower.contains("interstate") || roadLower.contains("i-") || roadLower.contains("freeway")) {
+            return "Interstate/Freeway";
+        }
+        if (roadLower.contains("highway") || roadLower.contains("hwy") || roadLower.contains("us-") || roadLower.contains("state route")) {
+            return "Highway";
+        }
+        if (roadLower.contains("expressway") || roadLower.contains("parkway") || roadLower.contains("turnpike")) {
+            return "Expressway";
+        }
+        if (roadLower.contains("boulevard") || roadLower.contains("blvd")) {
+            return "Boulevard";
+        }
+        if (roadLower.contains("avenue") || roadLower.contains("ave")) {
+            return "Avenue";
+        }
+
+        // Use OSM highway type classification
+        // Major roads - high speed, limited access
+        if (osmType.equals("motorway")) {
+            return "Interstate/Freeway";
+        }
+        if (osmType.equals("motorway_link")) {
+            return "Freeway on/off ramp";
+        }
+        if (osmType.equals("trunk")) {
+            return "Highway";
+        }
+        if (osmType.equals("trunk_link")) {
+            return "Highway ramp";
+        }
+
+        // Urban arterials - major city roads
+        if (osmType.equals("primary")) {
+            return "Primary arterial";
+        }
+        if (osmType.equals("primary_link")) {
+            return "Primary arterial ramp";
+        }
+        if (osmType.equals("secondary")) {
+            return "Secondary arterial";
+        }
+        if (osmType.equals("secondary_link")) {
+            return "Secondary arterial ramp";
+        }
+
+        // Collector roads - connect residential to arterials
+        if (osmType.equals("tertiary")) {
+            return "Collector road";
+        }
+        if (osmType.equals("tertiary_link")) {
+            return "Collector road ramp";
+        }
+
+        // Local roads
+        if (osmType.equals("unclassified")) {
+            return "Local road";
+        }
+        if (osmType.equals("residential")) {
+            return "Residential street";
+        }
+        if (osmType.equals("living_street")) {
+            return "Residential (shared space)";
+        }
+
+        // Service and access roads
+        if (osmType.equals("service")) {
+            return "Service/Access road";
+        }
+        if (osmType.equals("track")) {
+            return "Unpaved track";
+        }
+
+        // Parking and driveways
+        if (osmType.equals("parking_aisle")) {
+            return "Parking lot";
+        }
+        if (osmType.equals("driveway")) {
+            return "Private driveway";
+        }
+
+        // Pedestrian and bike areas (accident may have occurred here)
+        if (osmType.equals("pedestrian")) {
+            return "Pedestrian area";
+        }
+        if (osmType.equals("cycleway")) {
+            return "Bike path";
+        }
+        if (osmType.equals("footway") || osmType.equals("path")) {
+            return "Footpath";
+        }
+
+        // Other OSM place types (when coordinates land on a building/place, not a road)
+        if (osmClass.equals("building")) {
+            return "Building/Structure";
+        }
+        if (osmClass.equals("amenity")) {
+            return "Commercial/Public facility";
+        }
+        if (osmClass.equals("shop")) {
+            return "Commercial area";
+        }
+        if (osmClass.equals("place")) {
+            return "General area";
+        }
+        if (osmClass.equals("landuse")) {
+            return osmType.equals("residential") ? "Residential area" : "Land use area";
+        }
+
+        // Generic highway class (catch-all for road types)
+        if (osmClass.equals("highway")) {
+            return "Road";
+        }
+
+        // Default
+        return "Unknown (" + osmClass + "/" + osmType + ")";
+    }
+
+    /**
+     * Fallback location when geocoding fails.
+     */
+    private LocationDetails getFallbackLocation(double latitude, double longitude) {
+        String address = String.format("GPS: %.4f, %.4f (geocoding unavailable)", latitude, longitude);
+        return new LocationDetails(address, "Unknown", null);
     }
 
     /**
@@ -372,7 +562,9 @@ public class EnvironmentService {
         }
 
         // Simulated road attributes
-        int speedLimit = random.nextBoolean() ? 35 : (random.nextBoolean() ? 45 : 55);
+        // Note: Speed limit comes from telemetry device data (shown in Impact Analysis)
+        // We use 0 here to indicate "not determined by environment service"
+        int speedLimit = 0;
         int lanes = random.nextBoolean() ? 2 : 4;
         boolean construction = random.nextDouble() < 0.1; // 10% chance
 

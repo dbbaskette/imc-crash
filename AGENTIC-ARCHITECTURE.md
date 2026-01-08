@@ -248,35 +248,61 @@ Level 2 (needs everything):
 ### Visual Execution Graph
 
 ```
-                         AccidentEvent
-                              │
-            ┌─────────────────┼─────────────────┐
-            │                 │                 │
-            ▼                 ▼                 ▼
-     ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-     │ analyzeImpact│  │gatherEnviron │  │ lookupPolicy │
-     │              │  │    ment      │  │              │
-     └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
-            │                 │                 │
-            │    ImpactAnalysis                 │  PolicyInfo
-            │         │                         │     │
-            ▼         │                         ▼     │
-     ┌──────────────┐ │                  ┌──────────────┐
-     │ findServices │ │                  │initiateComms │
-     │              │ │                  │              │
-     └──────┬───────┘ │                  └──────┬───────┘
-            │         │                         │
-            │         │    EnvironmentContext   │
-            │         │         │               │
-            ▼         ▼         ▼               ▼
-          ┌─────────────────────────────────────────┐
-          │             compileReport               │
-          │                                         │
-          └─────────────────────────────────────────┘
-                              │
-                              ▼
-                         FNOLReport
+                              AccidentEvent
+                                    │
+              ┌─────────────────────┼─────────────────────┐
+              │                     │                     │
+              ▼                     ▼                     ▼
+       ┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+       │ analyzeImpact│      │gatherEnviron │      │ lookupPolicy │
+       │              │      │    ment      │      │              │
+       │ MCP: Impact  │      │ MCP: Environ │      │ MCP: Policy  │
+       │   Analyst    │      │  (Nominatim) │      │              │
+       └──────┬───────┘      └──────┬───────┘      └──────┬───────┘
+              │                     │                     │
+              │  ImpactAnalysis     │ EnvironmentContext  │  PolicyInfo
+              │       │             │        │            │     │
+              ▼       │             │        │            ▼     │
+       ┌──────────────┐             │        │     ┌──────────────┐
+       │ findServices │             │        │     │initiateComms │
+       │              │             │        │     │              │
+       │ MCP: Services│             │        │     │ MCP: Comms   │
+       │              │             │        │     │ (Twilio SMS) │
+       └──────┬───────┘             │        │     └──────┬───────┘
+              │                     │        │            │
+              │  NearbyServices     │        │            │ CommunicationsStatus
+              │       │             │        │            │     │
+              ▼       ▼             ▼        ▼            ▼     ▼
+            ┌───────────────────────────────────────────────────────┐
+            │                    compileReport                       │
+            │                                                        │
+            │  Aggregates all data into comprehensive FNOLReport     │
+            └───────────────────────────┬───────────────────────────┘
+                                        │
+                                        ▼
+                                   FNOLReport
+                                        │
+                                        ▼
+                            ┌───────────────────────┐
+                            │  sendFnolToAdjuster   │
+                            │                       │
+                            │  MCP: Communications  │
+                            │  (Gmail SMTP Email)   │
+                            └───────────────────────┘
+                                        │
+                                        ▼
+                               Email sent to adjuster
+                               FNOL persisted to DB
 ```
+
+### Data Flow Summary
+
+| Level | Actions | Dependencies | MCP Tools Used |
+|-------|---------|--------------|----------------|
+| 0 | analyzeImpact, gatherEnvironment, lookupPolicy | AccidentEvent only | analyze_impact, reverseGeocode, getWeather, lookupPolicy |
+| 1 | findServices, initiateComms | ImpactAnalysis, PolicyInfo | findNearbyServices, sendSms, checkDriverWelfare |
+| 2 | compileReport | All of the above | (local aggregation) |
+| 3 | sendFnolToAdjuster | FNOLReport | notifyAdjuster (Gmail) |
 
 ## Type-Based Dependency Resolution
 
@@ -453,16 +479,27 @@ Agents communicate using MCP, a standardized protocol for LLM tool use:
 
 ## Component Overview
 
+### 0. Telematics Generator (imc-telematics-gen)
+Simulates realistic vehicle telemetry from 15 drivers on Atlanta routes:
+- WebSocket dashboard for real-time monitoring
+- Realistic GPS routes (I-75/I-85 Downtown Connector, GA-400, Peachtree St, etc.)
+- Configurable crash frequency and G-force thresholds
+- **Publisher Confirms**: Critical crash events use RabbitMQ publisher confirms with 3x retry
+- **Metrics**: `telematics.messages.sent`, `telematics.messages.failed`, `telematics.messages.retried`
+
 ### 1. Message Source (RabbitMQ)
-Telemetry events from vehicles arrive via RabbitMQ:
+Telemetry events from vehicles arrive via RabbitMQ with guaranteed delivery:
 ```json
 {
   "policy_id": 200015,
   "vehicle_id": 300342,
+  "driver_id": 400015,
   "g_force": 4.2,
   "speed_mph": 45.5,
-  "gps_latitude": 39.1157,
-  "gps_longitude": -77.5636,
+  "gps_latitude": 33.7490,
+  "gps_longitude": -84.3880,
+  "current_street": "Peachtree St at 10th Street",
+  "vin": "1HGBH41JXMN109186",
   ...
 }
 ```
@@ -493,11 +530,11 @@ public class CrashAgent {
 
 ### 4. Specialist MCP Servers
 Each provides domain-specific tools:
-- **Impact Analyst** (`:8081`): Crash analysis
-- **Environment** (`:8082`): Weather/location (uses Open-Meteo API)
-- **Policy** (`:8083`): Insurance lookup
-- **Services** (`:8084`): Local service finder
-- **Communications** (`:8085`): Notifications
+- **Impact Analyst** (`:8081`): Crash analysis, severity classification, impact type detection
+- **Environment** (`:8082`): Real reverse geocoding (Nominatim), weather (Open-Meteo), 24hr history, road conditions
+- **Policy** (`:8083`): Insurance lookup, coverage details, driver/vehicle info
+- **Services** (`:8084`): Nearby body shops, tow services, hospitals (severity-based)
+- **Communications** (`:8085`): SMS via Twilio, email via Gmail SMTP, adjuster notifications
 
 ### 5. Persistence Layer
 - **PostgreSQL**: Stores FNOL reports
@@ -506,34 +543,43 @@ Each provides domain-specific tools:
 ## Execution Flow
 
 ```
-1. TELEMETRY EVENT arrives via RabbitMQ
+1. TELEMATICS-GEN simulates vehicle telemetry (15 drivers on Atlanta routes)
    │
    ▼
-2. CRASH SINK deserializes to TelemetryMessage
+2. CRASH EVENT detected (g-force > 2.5) with PUBLISHER CONFIRMS + RETRY
    │
    ▼
-3. MAPPER transforms to AccidentEvent
+3. MESSAGE published to RabbitMQ (telematics_exchange, fanout)
    │
    ▼
-4. FNOL SERVICE invokes CrashAgent with AccidentEvent
+4. CRASH SINK consumes message, deserializes to TelemetryMessage
    │
    ▼
-5. EMBABEL PLANNER analyzes goal (FNOLReport) and builds plan
+5. MAPPER transforms to AccidentEvent (with real GPS coordinates)
+   │
+   ▼
+6. FNOL SERVICE invokes CrashAgent with AccidentEvent
+   │
+   ▼
+7. EMBABEL PLANNER (GOAP) analyzes goal and builds execution plan
    │
    ├── Parallel: analyzeImpact, gatherEnvironment, lookupPolicy
-   │   │
+   │   │         └── Nominatim reverse geocoding (real addresses)
+   │   │         └── Open-Meteo weather + 24hr history
    │   ▼
    ├── Parallel: findServices, initiateComms (after dependencies met)
-   │   │
+   │   │         └── Twilio SMS to driver
    │   ▼
    └── compileReport (when all inputs available)
    │
    ▼
-6. FNOL REPORT generated
+8. FNOL REPORT generated with complete claim details
    │
-   ├── Persisted to PostgreSQL
+   ├── sendFnolToAdjuster → Gmail email to claims team
    │
-   └── Published to output queue
+   ├── Persisted to PostgreSQL (fnol_entities table)
+   │
+   └── Published to fnol_reports queue
 ```
 
 ## MCP (Model Context Protocol)
@@ -670,4 +716,4 @@ spring:
 
 ---
 
-*This document describes the CRASH (Claims Response Agent System Hive) architecture as implemented with Embabel Agent Framework 0.3.1 and Spring AI 1.1.0.*
+*This document describes the CRASH (Claims Response Agent System Hive) architecture as implemented with Embabel Agent Framework 0.3.2, Spring AI 1.1.2, and Google Gemini 2.5 Flash.*

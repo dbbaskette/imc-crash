@@ -7,6 +7,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VARS_FILE="${SCRIPT_DIR}/vars.yaml"
+ENV_FILE="${SCRIPT_DIR}/.env"
 
 # Colors
 RED='\033[0;31m'
@@ -26,27 +27,130 @@ echo "  Claims Response Agent System Hive"
 echo -e "${NC}"
 echo
 
-# Parse YAML value
-parse_yaml() {
+# Parse YAML value - handles nested keys like "openai.api_key"
+parse_yaml_value() {
     local file=$1
-    local key=$2
-    grep -E "^\s*${key}:" "$file" 2>/dev/null | head -1 | sed 's/[^:]*:[[:space:]]*//' | sed 's/^"//' | sed 's/"$//' | sed "s/^'//" | sed "s/'$//"
+    local section=$2
+    local key=$3
+
+    # Use awk to parse YAML - find section then find key within it
+    awk -v section="$section" -v key="$key" '
+        BEGIN { in_section = 0 }
+        /^[a-zA-Z]/ { in_section = 0 }
+        $0 ~ "^" section ":" { in_section = 1; next }
+        in_section && $0 ~ "^[[:space:]]+" key ":" {
+            # Extract value after the key
+            gsub(/^[[:space:]]*[^:]+:[[:space:]]*/, "")
+            # Handle quoted strings - extract content between quotes
+            if (match($0, /^"[^"]*"/)) {
+                print substr($0, 2, RLENGTH - 2)
+            } else if (match($0, /^'"'"'[^'"'"']*'"'"'/)) {
+                print substr($0, 2, RLENGTH - 2)
+            } else {
+                # Unquoted - take until comment or end
+                val = $0
+                gsub(/[[:space:]]*#.*$/, "", val)
+                gsub(/[[:space:]]+$/, "", val)
+                print val
+            }
+            exit
+        }
+    ' "$file"
 }
 
-# Load API key from vars.yaml
+# Load configuration from vars.yaml
 if [ -f "$VARS_FILE" ]; then
     echo -e "${GREEN}✓ Loading configuration from vars.yaml${NC}"
-    OPENAI_API_KEY=$(parse_yaml "$VARS_FILE" "api_key" | head -1)
 
-    if [ -z "$OPENAI_API_KEY" ] || [ "$OPENAI_API_KEY" = "sk-your-openai-api-key-here" ]; then
-        echo -e "${RED}ERROR: Please set your OpenAI API key in vars.yaml${NC}"
+    # Start fresh .env file
+    echo "# Auto-generated from vars.yaml - do not edit directly" > "$ENV_FILE"
+    echo "# Generated at: $(date)" >> "$ENV_FILE"
+    echo "" >> "$ENV_FILE"
+
+    # OpenAI Configuration
+    OPENAI_API_KEY=$(parse_yaml_value "$VARS_FILE" "openai" "api_key")
+    if [ -n "$OPENAI_API_KEY" ] && [ "$OPENAI_API_KEY" != "sk-your-openai-api-key-here" ]; then
+        echo "OPENAI_API_KEY=${OPENAI_API_KEY}" >> "$ENV_FILE"
+        echo -e "  ${GREEN}✓${NC} OPENAI_API_KEY"
+    fi
+
+    # Anthropic Configuration
+    ANTHROPIC_API_KEY=$(parse_yaml_value "$VARS_FILE" "anthropic" "api_key")
+    if [ -n "$ANTHROPIC_API_KEY" ]; then
+        echo "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}" >> "$ENV_FILE"
+        echo -e "  ${GREEN}✓${NC} ANTHROPIC_API_KEY"
+    fi
+
+    # Google Gemini Configuration
+    GOOGLE_API_KEY=$(parse_yaml_value "$VARS_FILE" "google" "api_key")
+    GOOGLE_MODEL=$(parse_yaml_value "$VARS_FILE" "google" "model")
+    if [ -n "$GOOGLE_API_KEY" ] && [ "$GOOGLE_API_KEY" != "YOUR_GOOGLE_API_KEY" ]; then
+        echo "" >> "$ENV_FILE"
+        echo "# Google Gemini Configuration" >> "$ENV_FILE"
+        echo "GOOGLE_API_KEY=${GOOGLE_API_KEY}" >> "$ENV_FILE"
+        echo -e "  ${GREEN}✓${NC} GOOGLE_API_KEY"
+        if [ -n "$GOOGLE_MODEL" ]; then
+            echo "GOOGLE_MODEL=${GOOGLE_MODEL}" >> "$ENV_FILE"
+            echo -e "  ${GREEN}✓${NC} GOOGLE_MODEL (${GOOGLE_MODEL})"
+        fi
+    fi
+
+    # Twilio Configuration
+    TWILIO_ACCOUNT_SID=$(parse_yaml_value "$VARS_FILE" "twilio" "account_sid")
+    TWILIO_AUTH_TOKEN=$(parse_yaml_value "$VARS_FILE" "twilio" "auth_token")
+    TWILIO_FROM_NUMBER=$(parse_yaml_value "$VARS_FILE" "twilio" "from_number")
+
+    if [ -n "$TWILIO_ACCOUNT_SID" ]; then
+        echo "" >> "$ENV_FILE"
+        echo "# Twilio Configuration" >> "$ENV_FILE"
+        echo "TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}" >> "$ENV_FILE"
+        echo -e "  ${GREEN}✓${NC} TWILIO_ACCOUNT_SID"
+    fi
+
+    if [ -n "$TWILIO_AUTH_TOKEN" ]; then
+        echo "TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}" >> "$ENV_FILE"
+        echo -e "  ${GREEN}✓${NC} TWILIO_AUTH_TOKEN"
+    fi
+
+    if [ -n "$TWILIO_FROM_NUMBER" ]; then
+        echo "TWILIO_FROM_NUMBER=${TWILIO_FROM_NUMBER}" >> "$ENV_FILE"
+        echo -e "  ${GREEN}✓${NC} TWILIO_FROM_NUMBER"
+    else
+        echo -e "  ${YELLOW}⚠${NC} TWILIO_FROM_NUMBER not set (SMS will be simulated)"
+    fi
+
+    # Gmail Configuration
+    GMAIL_USERNAME=$(parse_yaml_value "$VARS_FILE" "gmail" "username")
+    GMAIL_APP_PASSWORD=$(parse_yaml_value "$VARS_FILE" "gmail" "app_password")
+    GMAIL_ADJUSTER_EMAIL=$(parse_yaml_value "$VARS_FILE" "gmail" "adjuster_email")
+
+    if [ -n "$GMAIL_USERNAME" ] && [ -n "$GMAIL_APP_PASSWORD" ]; then
+        echo "" >> "$ENV_FILE"
+        echo "# Gmail Configuration" >> "$ENV_FILE"
+        echo "GMAIL_USERNAME=${GMAIL_USERNAME}" >> "$ENV_FILE"
+        echo "GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD}" >> "$ENV_FILE"
+        echo -e "  ${GREEN}✓${NC} GMAIL_USERNAME"
+        echo -e "  ${GREEN}✓${NC} GMAIL_APP_PASSWORD"
+
+        if [ -n "$GMAIL_ADJUSTER_EMAIL" ]; then
+            echo "GMAIL_ADJUSTER_EMAIL=${GMAIL_ADJUSTER_EMAIL}" >> "$ENV_FILE"
+            echo -e "  ${GREEN}✓${NC} GMAIL_ADJUSTER_EMAIL"
+        else
+            echo -e "  ${YELLOW}⚠${NC} GMAIL_ADJUSTER_EMAIL not set (will use default)"
+        fi
+    else
+        echo -e "  ${YELLOW}⚠${NC} Gmail not configured (emails will be simulated)"
+    fi
+
+    echo ""
+
+    # Validate at least one LLM API key is set
+    if [ -z "$OPENAI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$GOOGLE_API_KEY" ]; then
+        echo -e "${RED}ERROR: No LLM API key configured${NC}"
+        echo "Please set openai.api_key, anthropic.api_key, or google.api_key in vars.yaml"
         exit 1
     fi
 
-    export OPENAI_API_KEY
-    # Write to .env for docker-compose to pick up
-    echo "OPENAI_API_KEY=${OPENAI_API_KEY}" > "${SCRIPT_DIR}/.env"
-    echo -e "${GREEN}✓ OPENAI_API_KEY loaded${NC}"
 else
     echo -e "${RED}ERROR: vars.yaml not found${NC}"
     echo "Please create vars.yaml from vars.yaml.template:"

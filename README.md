@@ -1,14 +1,7 @@
 # CRASH - Claims Response Agent System Hive
 
-```
-   ____  ____      _     ____   _   _
-  / ___||  _ \    / \   / ___| | | | |
- | |    | |_) |  / _ \  \___ \ | |_| |
- | |___ |  _ <  / ___ \  ___) ||  _  |
-  \____||_| \_\/_/   \_\|____/ |_| |_|
+![CRASH Banner](assets/images/imc-crash.jpg)
 
-  Claims Response Agent System Hive
-```
 
 A multi-agent **First Notice of Loss (FNOL)** system that automatically processes vehicle accident claims using coordinated AI agents working together like a hive.
 

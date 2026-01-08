@@ -20,6 +20,7 @@ public class TwilioConfig {
     private String accountSid;
     private String authToken;
     private String fromNumber;
+    private String testToNumber;  // Optional override for all SMS recipients
     private boolean enabled = true;
 
     @PostConstruct
@@ -28,6 +29,9 @@ public class TwilioConfig {
             Twilio.init(accountSid, authToken);
             log.info("Twilio initialized successfully with account SID: {}...",
                     accountSid.substring(0, Math.min(8, accountSid.length())));
+            if (hasTestToNumber()) {
+                log.info("Test mode enabled - all SMS will be sent to: {}", testToNumber);
+            }
         } else {
             log.warn("Twilio not configured - SMS will be simulated. " +
                     "Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER to enable.");
@@ -73,5 +77,17 @@ public class TwilioConfig {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public String getTestToNumber() {
+        return testToNumber;
+    }
+
+    public void setTestToNumber(String testToNumber) {
+        this.testToNumber = testToNumber;
+    }
+
+    public boolean hasTestToNumber() {
+        return testToNumber != null && !testToNumber.isBlank();
     }
 }

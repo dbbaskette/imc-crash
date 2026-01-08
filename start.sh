@@ -119,6 +119,12 @@ if [ -f "$VARS_FILE" ]; then
         echo -e "  ${YELLOW}⚠${NC} TWILIO_FROM_NUMBER not set (SMS will be simulated)"
     fi
 
+    TWILIO_TEST_TO_NUMBER=$(parse_yaml_value "$VARS_FILE" "twilio" "test_to_number")
+    if [ -n "$TWILIO_TEST_TO_NUMBER" ]; then
+        echo "TWILIO_TEST_TO_NUMBER=${TWILIO_TEST_TO_NUMBER}" >> "$ENV_FILE"
+        echo -e "  ${GREEN}✓${NC} TWILIO_TEST_TO_NUMBER (all SMS will go to this number)"
+    fi
+
     # Gmail Configuration
     GMAIL_USERNAME=$(parse_yaml_value "$VARS_FILE" "gmail" "username")
     GMAIL_APP_PASSWORD=$(parse_yaml_value "$VARS_FILE" "gmail" "app_password")

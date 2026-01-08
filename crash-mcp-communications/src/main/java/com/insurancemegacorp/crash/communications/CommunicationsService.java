@@ -69,9 +69,18 @@ public class CommunicationsService {
 
         if (twilioConfig.isEnabled()) {
             // Send real SMS via Twilio
+            // Use test number override if configured (for testing with fake customer numbers)
+            String effectiveToNumber = twilioConfig.hasTestToNumber()
+                ? twilioConfig.getTestToNumber()
+                : phoneNumber;
+
+            if (twilioConfig.hasTestToNumber()) {
+                log.info("Test mode: redirecting SMS from {} to {}", phoneNumber, effectiveToNumber);
+            }
+
             try {
                 Message twilioMessage = Message.creator(
-                    new PhoneNumber(phoneNumber),
+                    new PhoneNumber(effectiveToNumber),
                     new PhoneNumber(twilioConfig.getFromNumber()),
                     message
                 ).create();

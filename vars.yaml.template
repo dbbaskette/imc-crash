@@ -27,6 +27,7 @@ twilio:
   account_sid: ""
   auth_token: ""
   from_number: ""  # Your Twilio phone number (e.g., +15551234567)
+  test_to_number: ""  # Optional: Override recipient for testing (e.g., +15551234567)
 
 # Gmail Configuration (for email notifications to adjusters)
 # To use Gmail SMTP, you need to:

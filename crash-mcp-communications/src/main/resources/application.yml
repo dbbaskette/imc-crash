@@ -34,6 +34,7 @@ twilio:
   account-sid: ${TWILIO_ACCOUNT_SID:}
   auth-token: ${TWILIO_AUTH_TOKEN:}
   from-number: ${TWILIO_FROM_NUMBER:}
+  test-to-number: ${TWILIO_TEST_TO_NUMBER:}  # Optional override for all SMS recipients
 
 # Gmail SMTP Configuration
 gmail:

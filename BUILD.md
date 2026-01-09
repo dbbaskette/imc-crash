@@ -346,14 +346,55 @@ crash:
       moderate-speed-delta: 25
 ```
 
+## Real vs Simulated Services
+
+The following table shows which components use real external services vs simulated/local data:
+
+| Component | Service | Status | Details |
+|-----------|---------|--------|---------|
+| **Environment** | Reverse Geocoding | **REAL** | OpenStreetMap Nominatim API - real addresses from GPS |
+| **Environment** | Weather | **REAL** | Open-Meteo API - current conditions + 24hr history |
+| **Environment** | Road Conditions | **REAL** | LLM-assessed from weather data (precipitation, visibility) |
+| **Communications** | SMS | **REAL** | Twilio SDK - sends actual SMS messages |
+| **Communications** | Email | **REAL** | Gmail SMTP - sends FNOL reports to adjusters |
+| **Policy** | Policy Data | **REAL** | PostgreSQL database - 15 pre-loaded policies |
+| **Policy** | Driver Info | **REAL** | PostgreSQL database - full driver profiles |
+| **Policy** | Vehicle Info | **REAL** | PostgreSQL database - complete vehicle details |
+| **Impact Analyst** | Severity Classification | Rules-based | Threshold algorithm (g-force ≥5.0=SEVERE, ≥3.0=MODERATE) |
+| **Impact Analyst** | Impact Type Detection | Rules-based | Accelerometer pattern matching (X/Y/Z axis analysis) |
+| **Impact Analyst** | Narrative Generation | **REAL** | LLM-generated professional incident description |
+| **Services** | Body Shops | Simulated | Mock data based on location + severity |
+| **Services** | Tow Services | Simulated | Mock data based on location + severity |
+| **Services** | Hospitals | Simulated | Mock data based on location + severity |
+| **Telematics** | Driver Simulation | Local | 15 drivers on realistic Atlanta GPS routes |
+| **Telematics** | Crash Events | Local | RabbitMQ with publisher confirms |
+| **Orchestrator** | GOAP Planning | **REAL** | Embabel Agent Framework goal-based planning |
+| **Orchestrator** | LLM Reasoning | **REAL** | Google Gemini 2.5 Flash via Google AI API |
+| **Persistence** | FNOL Reports | **REAL** | PostgreSQL database storage |
+
+### Configuration Required for Real Services
+
+| Service | Configuration | Location |
+|---------|--------------|----------|
+| Google AI (Gemini) | `GOOGLE_API_KEY` | `vars.yaml` → `google.api_key` |
+| Twilio SMS | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | `vars.yaml` → `twilio.*` |
+| Gmail SMTP | `GMAIL_USERNAME`, `GMAIL_APP_PASSWORD` | `vars.yaml` → `gmail.*` |
+| PostgreSQL | Auto-configured | Docker Compose (localhost:5432) |
+
+### Test Mode Options
+
+| Option | Purpose |
+|--------|---------|
+| `twilio.test_to_number` | Redirect all SMS to a single test number instead of customer phones |
+| Simulated services | Body shops, tow, hospitals return realistic mock data |
+
 ## Next Steps
 
-1. **Add Real APIs** - Replace simulated services with real weather, places, and SMS APIs
-2. **Add Persistence** - Store claims in a database
-3. **Add UI** - Build a claims dashboard showing real-time FNOL processing
-4. **Add Fraud Detection Agent** - New hive member that analyzes patterns for anomalies
-5. **Add Fleet Manager Agent** - For commercial fleet use cases
-6. **Deploy to Cloud** - Containerize and deploy to Kubernetes
+1. **Add Real Services API** - Replace simulated body shops/tow/hospitals with Google Places API
+2. **Add UI** - Build a claims dashboard showing real-time FNOL processing
+3. **Add Fraud Detection Agent** - New hive member that analyzes patterns for anomalies
+4. **Add Fleet Manager Agent** - For commercial fleet use cases
+5. **Deploy to Cloud** - Containerize and deploy to Kubernetes
 
 ## License
 

@@ -1,6 +1,6 @@
 # IMC-CRASH - Claims Response Agent System Hive
 
-![CRASH Banner](assets/images/imc-crash.png)
+![CRASH Banner](assets/images/imc-crash-logo.jpeg)
 
 A multi-agent **First Notice of Loss (FNOL)** system that automatically processes vehicle accident claims using coordinated AI agents working together like a hive.
 

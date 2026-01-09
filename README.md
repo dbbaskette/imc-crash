@@ -1,49 +1,48 @@
-# CRASH - Claims Response Agent System Hive
+# IMC-CRASH - Claims Response Agent System Hive
 
 ![CRASH Banner](assets/images/imc-crash.jpg)
 
-
 A multi-agent **First Notice of Loss (FNOL)** system that automatically processes vehicle accident claims using coordinated AI agents working together like a hive.
 
-## What is CRASH?
+## What is IMC-CRASH?
 
-When a vehicle accident is detected via telemetry (g-force threshold exceeded from a safe driver app), CRASH dynamically orchestrates **5 specialized AI agents** to generate a complete, comprehensive FNOL claim report — automatically.
+When a vehicle accident is detected via telemetry (g-force threshold exceeded from a safe driver app), IMC-CRASH dynamically orchestrates **5 specialized AI agents** to generate a complete, comprehensive FNOL claim report — automatically.
 
 Each agent is an independent microservice that contributes its expertise:
 
-| Agent | Port | Responsibility | Docs |
-|-------|------|----------------|------|
-| **Impact Analyst** | 8081 | Analyzes telemetry to classify severity and impact type | [README](crash-mcp-impact-analyst/README.md) |
-| **Environment** | 8082 | Gathers weather, road conditions, and location context | [README](crash-mcp-environment/README.md) |
-| **Policy** | 8083 | Retrieves insurance coverage, driver profile, and vehicle details from PostgreSQL | [README](crash-mcp-policy/README.md) |
-| **Services** | 8084 | Locates nearby body shops, tow services, hospitals | [README](crash-mcp-services/README.md) |
-| **Communications** | 8085 | Handles driver outreach, SMS, email, and adjuster alerts | [README](crash-mcp-communications/README.md) |
+| Agent | Responsibility | Details |
+|-------|----------------|---------|
+| **Impact Analyst** | Analyzes telemetry to classify severity and impact type | Rules-based classification + LLM narrative |
+| **Environment** | Gathers weather, road conditions, and location context | Real APIs (Nominatim, Open-Meteo) |
+| **Policy** | Retrieves insurance coverage, driver profile, and vehicle details | PostgreSQL database |
+| **Services** | Locates nearby body shops, tow services, hospitals | Severity-based recommendations |
+| **Communications** | Handles driver outreach, SMS, email, and adjuster alerts | Twilio SMS, Gmail SMTP |
 
 ## Architecture
 
 ```mermaid
 flowchart TB
     subgraph Input["Event Source"]
-        TG["TELEMATICS-GEN<br/>:8087<br/><br/>Simulates 15 drivers<br/>with realistic GPS<br/>routes & crash events"]
+        TEL["Telematics Events<br/>(vehicle crash detection)"]
     end
 
     subgraph Messaging["Message Broker"]
-        RMQ["RABBITMQ<br/>:5672<br/><br/>telematics_exchange<br/>(fanout)<br/>Publisher Confirms"]
+        RMQ["RabbitMQ<br/>telematics_exchange<br/>(fanout)"]
     end
 
     subgraph Orchestration["Orchestrator"]
-        ORCH["CRASH ORCHESTRATOR<br/>:8080<br/><br/>• Consumes crash events<br/>• GOAP planning for FNOL<br/>• Persists to PostgreSQL<br/>• Emails FNOL to adjusters"]
+        ORCH["IMC-CRASH ORCHESTRATOR<br/><br/>• Consumes crash events<br/>• GOAP planning for FNOL<br/>• Persists to PostgreSQL<br/>• Emails FNOL to adjusters"]
     end
 
-    TG --> RMQ --> ORCH
+    TEL --> RMQ --> ORCH
 
     subgraph Hive["THE HIVE (Independent Specialist Agents)"]
         direction TB
-        IA["IMPACT ANALYST<br/>:8081<br/><br/>Severity<br/>Impact Type"]
-        ENV["ENVIRONMENT<br/>:8082<br/><br/>Nominatim<br/>Open-Meteo<br/>LLM Assessment"]
-        POL["POLICY<br/>:8083<br/><br/>PostgreSQL<br/>Coverage<br/>Driver/Vehicle"]
-        SVC["SERVICES<br/>:8084<br/><br/>Nearby Tow<br/>Body Shop<br/>Hospital"]
-        COM["COMMUNICATIONS<br/>:8085<br/><br/>Twilio SMS<br/>Gmail Email"]
+        IA["IMPACT ANALYST<br/><br/>Rules-based Severity<br/>LLM Narrative"]
+        ENV["ENVIRONMENT<br/><br/>Nominatim Geocoding<br/>Open-Meteo Weather"]
+        POL["POLICY<br/><br/>PostgreSQL Database<br/>Coverage/Driver/Vehicle"]
+        SVC["SERVICES<br/><br/>Nearby Tow/Body/Hospital"]
+        COM["COMMUNICATIONS<br/><br/>Twilio SMS<br/>Gmail Email"]
     end
 
     ORCH <--> |"MCP/HTTP"| IA
@@ -53,82 +52,18 @@ flowchart TB
     ORCH <--> |"MCP/HTTP"| COM
 ```
 
-**Key Technologies:**
-- **Embabel Agent Framework 0.3.2** — Goal-based planning orchestrator using GOAP (full Java support)
-- **Spring AI 1.1.2** — Model Context Protocol for agent communication via SSE
+## Key Technologies
+
+- **Embabel Agent Framework** — Goal-based planning orchestrator using GOAP
+- **Spring AI** — Model Context Protocol (MCP) for agent communication
 - **Spring Boot 3.5.x** — Microservice foundation
-- **Google Gemini 2.5 Flash** — Fast LLM for reasoning and planning (via Google AI API)
+- **Google Gemini** — LLM for reasoning, planning, and narrative generation
 - **Open-Meteo API** — Real weather data including 24-hour historical analysis
 - **OpenStreetMap Nominatim** — Real reverse geocoding for accident location addresses
-- **RabbitMQ** — Message broker with publisher confirms for reliable crash event delivery
+- **Twilio** — SMS notifications to drivers
+- **Gmail SMTP** — FNOL email reports to adjusters
+- **RabbitMQ** — Message broker with publisher confirms
 - **PostgreSQL** — Policy data storage and FNOL report persistence
-
-## Quick Start
-
-### Prerequisites
-
-- Java 21+
-- Maven 3.9+
-- Docker & Docker Compose
-- Google AI API Key (Gemini) — get one at https://aistudio.google.com/apikey
-
-### 1. Clone and Build
-
-```bash
-git clone <repository-url>
-cd imc-crash
-mvn clean install
-```
-
-### 2. Configure Variables
-
-**Option A: Using vars.yaml (recommended)**
-```bash
-cp vars.yaml.template vars.yaml
-# Edit vars.yaml with your API key and settings
-```
-
-**Option B: Environment variable**
-```bash
-export GOOGLE_API_KEY=AIza...
-```
-
-### 3. Start the Hive
-
-**Option A: Using the start script**
-```bash
-./start.sh --build
-```
-
-**Option B: Using Docker Compose**
-```bash
-mvn clean package -DskipTests
-docker-compose up --build
-```
-
-**Option C: Manual startup** (6 terminals)
-```bash
-# Each in a separate terminal:
-cd crash-mcp-impact-analyst && mvn spring-boot:run      # :8081
-cd crash-mcp-environment && mvn spring-boot:run         # :8082
-cd crash-mcp-policy && mvn spring-boot:run              # :8083
-cd crash-mcp-services && mvn spring-boot:run            # :8084
-cd crash-mcp-communications && mvn spring-boot:run      # :8085
-cd crash-orchestrator && mvn spring-boot:run            # :8080
-```
-
-### 4. Simulate an Accident
-
-```bash
-# Moderate accident
-curl -X POST "http://localhost:8080/api/accident/simulate?policyId=200018&gForce=3.8&speedMph=34.5"
-
-# Severe accident
-curl -X POST "http://localhost:8080/api/accident/simulate?policyId=200019&gForce=6.2&speedMph=55"
-
-# Minor fender bender
-curl -X POST "http://localhost:8080/api/accident/simulate?policyId=200020&gForce=2.8&speedMph=15"
-```
 
 ## How It Works
 
@@ -137,89 +72,121 @@ curl -X POST "http://localhost:8080/api/accident/simulate?policyId=200020&gForce
 3. **Parallel Execution** — Impact, Environment, and Policy agents run simultaneously
 4. **Dependent Execution** — Services and Communications wait for required data
 5. **Report Compilation** — All results aggregated into comprehensive FNOL report
+6. **Notifications** — SMS to driver, email to adjuster, report persisted to database
 
 ### GOAP Execution Flow
-
-The system uses Goal-Oriented Action Planning to dynamically determine execution order based on dependencies:
 
 ```mermaid
 flowchart TB
     AE["AccidentEvent<br/>(from telemetry)"]
 
-    subgraph Level0["Level 0 - Parallel Execution (no dependencies)"]
+    subgraph Level0["Level 0 - Parallel Execution"]
         direction LR
-        AI["analyzeImpact<br/><br/>MCP: Impact Analyst"]
-        GE["gatherEnvironment<br/><br/>MCP: Environment"]
-        LP["lookupPolicy<br/><br/>MCP: Policy"]
+        AI["analyzeImpact"]
+        GE["gatherEnvironment"]
+        LP["lookupPolicy"]
     end
 
     AE --> AI
     AE --> GE
     AE --> LP
 
-    AI --> |"ImpactAnalysis<br/>(severity)"| FS
-    AI --> |"ImpactAnalysis"| IC
-    LP --> |"PolicyInfo<br/>(driver contact)"| IC
+    AI --> FS
+    AI --> IC
+    LP --> IC
 
-    subgraph Level1["Level 1 - Severity-Dependent Execution"]
+    subgraph Level1["Level 1 - Severity-Dependent"]
         direction LR
-        FS["findServices<br/><br/>MCP: Services<br/><br/>SEVERE: hospitals + tow<br/>MODERATE: tow + body<br/>MINOR: body shops only"]
-        IC["initiateComms<br/><br/>MCP: Communications<br/><br/>SEVERE: senior adjuster<br/>MODERATE: standard adjuster<br/>MINOR: SMS only"]
+        FS["findServices"]
+        IC["initiateComms"]
     end
 
-    GE --> |"EnvironmentContext"| CR
-    FS --> |"NearbyServices"| CR
-    IC --> |"CommunicationsStatus"| CR
+    GE --> CR
+    FS --> CR
+    IC --> CR
     AI --> CR
     LP --> CR
 
     subgraph Level2["Level 2 - Goal Achievement"]
-        CR["compileReport<br/><br/>Aggregates all data into<br/>comprehensive FNOLReport"]
+        CR["compileReport"]
     end
 
     CR --> FNOL["FNOLReport"]
-
-    subgraph Level3["Level 3 - Final Action"]
-        SEND["sendFnolToAdjuster<br/><br/>MCP: Communications<br/>(Gmail SMTP Email)"]
-    end
-
-    FNOL --> SEND
-    SEND --> OUT["GOAL ACHIEVED<br/>Email sent to adjuster<br/>FNOL persisted to DB"]
+    FNOL --> SEND["sendFnolToAdjuster"]
+    SEND --> OUT["Email sent + DB persisted"]
 
     style OUT fill:#228B22,color:#fff
 ```
 
 ### Severity-Based Behavior
 
-The system adapts its response based on accident severity:
+| Severity | Criteria | Services | Communications |
+|----------|----------|----------|----------------|
+| **SEVERE** | g-force ≥ 5.0 | Hospitals + tow + body shops | Senior adjuster, roadside dispatch |
+| **MODERATE** | g-force ≥ 3.0 | Tow + body shops + rentals | Standard adjuster assigned |
+| **MINOR** | g-force < 3.0 | Body shop referrals only | SMS notification only |
 
-| Severity | Services | Communications |
-|----------|----------|----------------|
-| **SEVERE** (g-force ≥ 5.0) | Hospitals + tow + body shops + rentals | Senior adjuster notified, roadside dispatched |
-| **MODERATE** (g-force ≥ 3.0) | Tow + body shops + rentals | Standard adjuster assigned |
-| **MINOR** (g-force < 3.0) | Body shop referrals only | SMS/push notification only |
+## Real vs Simulated Services
+
+| Component | Service | Status | Details |
+|-----------|---------|--------|---------|
+| **Environment** | Reverse Geocoding | **REAL** | OpenStreetMap Nominatim API |
+| **Environment** | Weather | **REAL** | Open-Meteo API + 24hr history |
+| **Communications** | SMS | **REAL** | Twilio SDK |
+| **Communications** | Email | **REAL** | Gmail SMTP |
+| **Policy** | Policy/Driver/Vehicle | **REAL** | PostgreSQL database |
+| **Impact Analyst** | Severity Classification | Rules-based | Threshold algorithm |
+| **Impact Analyst** | Narrative Generation | **REAL** | LLM-generated |
+| **Services** | Body Shops/Tow/Hospitals | Simulated | Mock data |
+| **Orchestrator** | GOAP Planning | **REAL** | Embabel Agent Framework |
+| **Orchestrator** | LLM Reasoning | **REAL** | Google Gemini |
+
+## Deployment Options
+
+| Environment | Documentation | Status |
+|-------------|---------------|--------|
+| **Local Development** | [LOCAL-DEVELOPMENT.md](LOCAL-DEVELOPMENT.md) | Available |
+| **Cloud Foundry** | [CLOUD-FOUNDRY.md](CLOUD-FOUNDRY.md) | Planned |
 
 ## Project Structure
 
 ```
 imc-crash/
 ├── crash-domain/                   # Shared domain objects (Java Records)
-├── crash-orchestrator/             # Central orchestrator + RabbitMQ sink (:8080/:8086)
-├── crash-mcp-impact-analyst/       # Impact analysis agent (:8081)
-├── crash-mcp-environment/          # Environment context agent (:8082)
-├── crash-mcp-policy/               # Policy lookup agent (:8083)
-├── crash-mcp-services/             # Services finder agent (:8084)
-├── crash-mcp-communications/       # Communications agent (:8085)
-├── docker-compose.yml              # Container orchestration (all services)
-├── vars.yaml                       # Configuration (API keys, Twilio, Gmail)
-├── simulate-accident.sh            # CLI tool for manual accident simulation
-└── AGENTIC-ARCHITECTURE.md         # Deep dive into GOAP and agent patterns
-
-../imc-telematics-gen/              # Telematics simulator (sibling project)
-├── WebSocket dashboard             # Real-time driver monitoring UI
-├── 15 Atlanta drivers              # Realistic GPS routes
-└── Crash event generator           # Demo accident triggering
+├── crash-orchestrator/             # Central orchestrator + RabbitMQ sink
+├── crash-mcp-impact-analyst/       # Impact analysis agent
+├── crash-mcp-environment/          # Environment context agent
+├── crash-mcp-policy/               # Policy lookup agent
+├── crash-mcp-services/             # Services finder agent
+├── crash-mcp-communications/       # Communications agent
+├── db/                             # Database schema and setup scripts
+├── docker-compose.yml              # Container orchestration
+├── vars.yaml.template              # Configuration template
+└── docs/
+    ├── LOCAL-DEVELOPMENT.md        # Local setup guide
+    ├── CLOUD-FOUNDRY.md            # CF deployment guide
+    ├── BUILD.md                    # Build and extension guide
+    └── AGENTIC-ARCHITECTURE.md     # GOAP and agent patterns
 ```
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [LOCAL-DEVELOPMENT.md](LOCAL-DEVELOPMENT.md) | Complete local setup with Docker Compose |
+| [CLOUD-FOUNDRY.md](CLOUD-FOUNDRY.md) | Cloud Foundry deployment guide |
+| [BUILD.md](BUILD.md) | Build guide, configuration reference, extending the system |
+| [AGENTIC-ARCHITECTURE.md](AGENTIC-ARCHITECTURE.md) | Deep dive into GOAP planning and agent patterns |
+
+### Agent Documentation
+
+Each agent has its own README with detailed tool documentation:
+
+- [Impact Analyst](crash-mcp-impact-analyst/README.md) — Severity classification, impact type detection
+- [Environment](crash-mcp-environment/README.md) — Weather APIs, road assessment, geocoding
+- [Policy](crash-mcp-policy/README.md) — Database-backed policy lookup
+- [Services](crash-mcp-services/README.md) — Nearby service location
+- [Communications](crash-mcp-communications/README.md) — Twilio SMS, Gmail SMTP
 
 ## API Reference
 
@@ -230,17 +197,17 @@ POST /api/accident
 Content-Type: application/json
 
 {
-  "policyId": 200018,
-  "vehicleId": 300021,
-  "driverId": 400018,
-  "vin": "1HGBH41JXMN109186",
+  "policyId": 200001,
+  "vehicleId": 300001,
+  "driverId": 400001,
+  "vin": "1G1RC6E45F0123451",
   "eventTime": "2025-01-06T14:47:00Z",
   "speedMph": 34.5,
   "speedLimitMph": 35,
   "gForce": 3.8,
-  "latitude": 39.1157,
-  "longitude": -77.5636,
-  "currentStreet": "Main Street",
+  "latitude": 33.7490,
+  "longitude": -84.3880,
+  "currentStreet": "Peachtree Street",
   "accelerometerX": -2.1,
   "accelerometerY": 0.3,
   "accelerometerZ": 0.8
@@ -253,99 +220,11 @@ Content-Type: application/json
 POST /api/accident/simulate?policyId={id}&gForce={value}&speedMph={value}
 ```
 
-### Health Check
-
-```bash
-GET /api/health                    # Orchestrator
-GET http://localhost:8081/actuator/health  # Impact Analyst
-# ... etc for ports 8082-8085
-```
-
-## Test Policies
-
-15 pre-configured policies are available, matching the telematics generator drivers:
-
-| Policy ID | Driver | Vehicle | Deductible |
-|-----------|--------|---------|------------|
-| `200001` | Sarah Chen | 2023 Chevrolet Equinox | $500 |
-| `200002` | Emily Carter | 2022 Nissan Rogue | $500 |
-| `200003` | Benjamin Rivera | 2023 Tesla Model 3 | $1,000 |
-| `200004` | Michael Harris | 2021 Audi Q5 | $500 |
-| `200005` | David Lee | 2022 Ford Explorer | $250 |
-| `200006` | Jessica Thompson | 2023 Ford F-150 | $500 |
-| `200007` | Andrew Martinez | 2023 Toyota Camry | $500 |
-| `200008` | Ashley Wilson | 2023 Honda CR-V | $750 |
-| `200009` | Christopher Garcia | 2023 Kia Telluride | $500 |
-| `200010` | Amanda Rodriguez | 2023 Hyundai Palisade | $500 |
-| `200011` | Daniel Johnson | 2023 Jeep Grand Cherokee | $500 |
-| `200012` | Lauren Brown | 2022 BMW X5 | $1,000 |
-| `200013` | Matthew Davis | 2023 Mazda CX-5 | $500 |
-| `200014` | Stephanie Miller | 2023 Lexus RX 350 | $500 |
-| `200015` | Ryan Anderson | 2023 Subaru Outback | $500 |
-
-All policies include full coverage (Comprehensive, Collision, Liability, Medical, Uninsured Motorist) with Roadside Assistance and Rental Coverage.
-
-## Documentation
-
-For detailed information, see:
-- [BUILD.md](BUILD.md) — Comprehensive build guide, configuration reference, and extension instructions
-- [AGENTIC-ARCHITECTURE.md](AGENTIC-ARCHITECTURE.md) — Deep dive into GOAP planning and agent patterns
-
-### Agent Documentation
-Each agent has its own README with detailed tool documentation:
-- [Impact Analyst](crash-mcp-impact-analyst/README.md) — Severity classification, impact type detection, accelerometer analysis
-- [Environment](crash-mcp-environment/README.md) — Weather APIs, LLM-based road assessment, geocoding
-- [Policy](crash-mcp-policy/README.md) — PostgreSQL-backed policy lookup, driver profiles, vehicle details
-- [Services](crash-mcp-services/README.md) — Nearby service location, severity-based recommendations
-- [Communications](crash-mcp-communications/README.md) — Twilio SMS, Gmail SMTP, adjuster notifications
-
-## Extending CRASH
-
-### Add a New Tool
-
-```java
-@Tool(description = "Estimate vehicle repair cost")
-public RepairEstimate estimateRepairCost(
-    @ToolParam(description = "Severity level") String severity,
-    @ToolParam(description = "Vehicle make") String make
-) {
-    // Implementation - automatically exposed via MCP
-}
-```
-
-### Add a New Agent
-
-1. Create module: `crash-mcp-<name>`
-2. Implement tools with `@Tool` annotations
-3. Add MCP client connection to orchestrator
-4. Create orchestrator actions that use the new tools
-
-## Recent Enhancements
-
-- **PostgreSQL-Backed Policy Data** — Policy agent now queries real database for policy, driver, and vehicle information (15 pre-loaded policies matching telematics drivers)
-- **Comprehensive FNOL Reports** — Email reports now include full policy details (coverage types, deductible, roadside/rental), complete driver information (email, risk score, emergency contact), and vehicle details (color, license plate, estimated value)
-- **Google Gemini 2.5 Flash** — Fast, reliable LLM for agent reasoning and tool orchestration
-- **Real Reverse Geocoding** — OpenStreetMap Nominatim API provides actual street addresses from GPS coordinates, with 30+ road type classifications (Interstate, Highway, Arterial, Residential, etc.)
-- **Publisher Confirms with Retry** — Critical crash events use RabbitMQ publisher confirms with 3x retry logic and exponential backoff to ensure no messages are lost
-- **Telematics Generator Integration** — Full simulation of 15 drivers on realistic Atlanta routes with real-time crash event generation via WebSocket dashboard
-- **24-Hour Weather History** — Environment agent analyzes weather conditions for the 24 hours prior to the accident, detecting significant events like heavy precipitation, snow, freeze/thaw cycles, and thunderstorms
-- **SMS Notifications** — Twilio integration with test number override for driver wellness checks and status updates
-- **PostgreSQL Persistence** — FNOL reports persisted with full audit trail
-- **Enhanced Impact Classification** — Improved detection of ROLLOVER, SIDE, REAR, and FRONTAL impacts using accelerometer data
-
-## Future Enhancements
-
-- Real-time claims dashboard UI
-- Fraud detection agent
-- Fleet manager agent
-- Kubernetes deployment
-- Integration with real SMS/notification services
-
 ## License
 
 Apache 2.0
 
 ---
 
-*CRASH - Claims Response Agent System Hive*
-*A multi-agent FNOL demonstration by Insurance Mega Corp*
+*IMC-CRASH - Claims Response Agent System Hive*
+*A multi-agent FNOL system by Insurance Mega Corp*

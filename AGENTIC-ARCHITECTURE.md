@@ -715,12 +715,12 @@ public class CrashAgent {
 Each provides domain-specific tools:
 - **Impact Analyst** (`:8081`): Crash analysis, severity classification, impact type detection
 - **Environment** (`:8082`): Real reverse geocoding (Nominatim), weather (Open-Meteo), 24hr history, road conditions
-- **Policy** (`:8083`): Insurance lookup, coverage details, driver/vehicle info
+- **Policy** (`:8083`): PostgreSQL-backed insurance lookup, coverage details, driver/vehicle info
 - **Services** (`:8084`): Nearby body shops, tow services, hospitals (severity-based)
 - **Communications** (`:8085`): SMS via Twilio, email via Gmail SMTP, adjuster notifications
 
 ### 5. Persistence Layer
-- **PostgreSQL**: Stores FNOL reports
+- **PostgreSQL**: Stores policy data (customers, policies, drivers, vehicles) and FNOL reports
 - **Output Queue**: Publishes reports for downstream systems
 
 ## Execution Flow
@@ -917,4 +917,4 @@ spring:
 
 ---
 
-*This document describes the CRASH (Claims Response Agent System Hive) architecture as implemented with Embabel Agent Framework 0.3.2, Spring AI 1.1.2, and Google Gemini 2.5 Flash.*
+*This document describes the CRASH (Claims Response Agent System Hive) architecture as implemented with Embabel Agent Framework 0.3.2, Spring AI 1.1.2, Google Gemini 2.5 Flash, and PostgreSQL for policy data storage.*

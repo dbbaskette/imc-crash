@@ -15,7 +15,7 @@ Each agent is an independent microservice that contributes its expertise:
 |-------|------|----------------|------|
 | **Impact Analyst** | 8081 | Analyzes telemetry to classify severity and impact type | [README](crash-mcp-impact-analyst/README.md) |
 | **Environment** | 8082 | Gathers weather, road conditions, and location context | [README](crash-mcp-environment/README.md) |
-| **Policy** | 8083 | Retrieves insurance coverage, driver profile, and vehicle details | [README](crash-mcp-policy/README.md) |
+| **Policy** | 8083 | Retrieves insurance coverage, driver profile, and vehicle details from PostgreSQL | [README](crash-mcp-policy/README.md) |
 | **Services** | 8084 | Locates nearby body shops, tow services, hospitals | [README](crash-mcp-services/README.md) |
 | **Communications** | 8085 | Handles driver outreach, SMS, email, and adjuster alerts | [README](crash-mcp-communications/README.md) |
 
@@ -41,7 +41,7 @@ flowchart TB
         direction TB
         IA["IMPACT ANALYST<br/>:8081<br/><br/>Severity<br/>Impact Type"]
         ENV["ENVIRONMENT<br/>:8082<br/><br/>Nominatim<br/>Open-Meteo<br/>LLM Assessment"]
-        POL["POLICY<br/>:8083<br/><br/>Coverage<br/>Driver<br/>Vehicle"]
+        POL["POLICY<br/>:8083<br/><br/>PostgreSQL<br/>Coverage<br/>Driver/Vehicle"]
         SVC["SERVICES<br/>:8084<br/><br/>Nearby Tow<br/>Body Shop<br/>Hospital"]
         COM["COMMUNICATIONS<br/>:8085<br/><br/>Twilio SMS<br/>Gmail Email"]
     end
@@ -61,7 +61,7 @@ flowchart TB
 - **Open-Meteo API** — Real weather data including 24-hour historical analysis
 - **OpenStreetMap Nominatim** — Real reverse geocoding for accident location addresses
 - **RabbitMQ** — Message broker with publisher confirms for reliable crash event delivery
-- **PostgreSQL** — FNOL report persistence
+- **PostgreSQL** — Policy data storage and FNOL report persistence
 
 ## Quick Start
 
@@ -263,13 +263,27 @@ GET http://localhost:8081/actuator/health  # Impact Analyst
 
 ## Test Policies
 
-Three pre-configured policies are available for testing:
+15 pre-configured policies are available, matching the telematics generator drivers:
 
-| Policy ID | Description |
-|-----------|-------------|
-| `200018` | Standard policy |
-| `200019` | Premium policy |
-| `200020` | Basic policy |
+| Policy ID | Driver | Vehicle | Deductible |
+|-----------|--------|---------|------------|
+| `200001` | Sarah Chen | 2023 Chevrolet Equinox | $500 |
+| `200002` | Emily Carter | 2022 Nissan Rogue | $500 |
+| `200003` | Benjamin Rivera | 2023 Tesla Model 3 | $1,000 |
+| `200004` | Michael Harris | 2021 Audi Q5 | $500 |
+| `200005` | David Lee | 2022 Ford Explorer | $250 |
+| `200006` | Jessica Thompson | 2023 Ford F-150 | $500 |
+| `200007` | Andrew Martinez | 2023 Toyota Camry | $500 |
+| `200008` | Ashley Wilson | 2023 Honda CR-V | $750 |
+| `200009` | Christopher Garcia | 2023 Kia Telluride | $500 |
+| `200010` | Amanda Rodriguez | 2023 Hyundai Palisade | $500 |
+| `200011` | Daniel Johnson | 2023 Jeep Grand Cherokee | $500 |
+| `200012` | Lauren Brown | 2022 BMW X5 | $1,000 |
+| `200013` | Matthew Davis | 2023 Mazda CX-5 | $500 |
+| `200014` | Stephanie Miller | 2023 Lexus RX 350 | $500 |
+| `200015` | Ryan Anderson | 2023 Subaru Outback | $500 |
+
+All policies include full coverage (Comprehensive, Collision, Liability, Medical, Uninsured Motorist) with Roadside Assistance and Rental Coverage.
 
 ## Documentation
 
@@ -281,7 +295,7 @@ For detailed information, see:
 Each agent has its own README with detailed tool documentation:
 - [Impact Analyst](crash-mcp-impact-analyst/README.md) — Severity classification, impact type detection, accelerometer analysis
 - [Environment](crash-mcp-environment/README.md) — Weather APIs, LLM-based road assessment, geocoding
-- [Policy](crash-mcp-policy/README.md) — Policy lookup, driver profiles, vehicle details
+- [Policy](crash-mcp-policy/README.md) — PostgreSQL-backed policy lookup, driver profiles, vehicle details
 - [Services](crash-mcp-services/README.md) — Nearby service location, severity-based recommendations
 - [Communications](crash-mcp-communications/README.md) — Twilio SMS, Gmail SMTP, adjuster notifications
 
@@ -308,13 +322,14 @@ public RepairEstimate estimateRepairCost(
 
 ## Recent Enhancements
 
+- **PostgreSQL-Backed Policy Data** — Policy agent now queries real database for policy, driver, and vehicle information (15 pre-loaded policies matching telematics drivers)
+- **Comprehensive FNOL Reports** — Email reports now include full policy details (coverage types, deductible, roadside/rental), complete driver information (email, risk score, emergency contact), and vehicle details (color, license plate, estimated value)
 - **Google Gemini 2.5 Flash** — Fast, reliable LLM for agent reasoning and tool orchestration
 - **Real Reverse Geocoding** — OpenStreetMap Nominatim API provides actual street addresses from GPS coordinates, with 30+ road type classifications (Interstate, Highway, Arterial, Residential, etc.)
 - **Publisher Confirms with Retry** — Critical crash events use RabbitMQ publisher confirms with 3x retry logic and exponential backoff to ensure no messages are lost
 - **Telematics Generator Integration** — Full simulation of 15 drivers on realistic Atlanta routes with real-time crash event generation via WebSocket dashboard
 - **24-Hour Weather History** — Environment agent analyzes weather conditions for the 24 hours prior to the accident, detecting significant events like heavy precipitation, snow, freeze/thaw cycles, and thunderstorms
-- **Complete FNOL Email Reports** — Automatically emails comprehensive claim reports to adjusters via Gmail SMTP, including weather, environment, services, and recommended actions
-- **SMS Notifications** — Twilio integration for driver wellness checks and status updates
+- **SMS Notifications** — Twilio integration with test number override for driver wellness checks and status updates
 - **PostgreSQL Persistence** — FNOL reports persisted with full audit trail
 - **Enhanced Impact Classification** — Improved detection of ROLLOVER, SIDE, REAR, and FRONTAL impacts using accelerometer data
 

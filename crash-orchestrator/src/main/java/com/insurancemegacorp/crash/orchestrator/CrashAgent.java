@@ -351,14 +351,33 @@ public class CrashAgent {
         sb.append("==================\n");
         sb.append(report.impact().narrative()).append("\n\n");
 
-        sb.append("DRIVER & VEHICLE\n");
-        sb.append("================\n");
-        sb.append("Driver: ").append(report.policy().driver().name()).append("\n");
+        sb.append("POLICY INFORMATION\n");
+        sb.append("==================\n");
+        sb.append("Policy Number: ").append(report.policy().policy().policyNumber()).append("\n");
+        sb.append("Status: ").append(report.policy().policy().status()).append("\n");
+        sb.append("Deductible: $").append(report.policy().policy().deductible()).append("\n");
+        sb.append("Coverage Types: ").append(String.join(", ", report.policy().policy().coverageTypes())).append("\n");
+        sb.append("Roadside Assistance: ").append(report.policy().policy().hasRoadsideAssistance() ? "Yes" : "No").append("\n");
+        sb.append("Rental Coverage: ").append(report.policy().policy().hasRentalCoverage() ? "Yes" : "No").append("\n\n");
+
+        sb.append("DRIVER INFORMATION\n");
+        sb.append("==================\n");
+        sb.append("Name: ").append(report.policy().driver().name()).append("\n");
         sb.append("Phone: ").append(report.policy().driver().phone()).append("\n");
+        sb.append("Email: ").append(report.policy().driver().email()).append("\n");
+        sb.append("Risk Score: ").append(report.policy().driver().riskScore()).append("/100\n");
+        sb.append("Emergency Contact: ").append(report.policy().driver().emergencyContactName())
+          .append(" (").append(report.policy().driver().emergencyContactPhone()).append(")\n\n");
+
+        sb.append("VEHICLE INFORMATION\n");
+        sb.append("===================\n");
         sb.append("Vehicle: ").append(report.policy().vehicle().year()).append(" ")
           .append(report.policy().vehicle().make()).append(" ")
           .append(report.policy().vehicle().model()).append("\n");
-        sb.append("VIN: ").append(report.policy().vehicle().vin()).append("\n\n");
+        sb.append("Color: ").append(report.policy().vehicle().color()).append("\n");
+        sb.append("VIN: ").append(report.policy().vehicle().vin()).append("\n");
+        sb.append("License Plate: ").append(report.policy().vehicle().licensePlate()).append("\n");
+        sb.append("Estimated Value: $").append(String.format("%,d", report.policy().vehicle().estimatedValue())).append("\n\n");
 
         sb.append("ENVIRONMENT & WEATHER\n");
         sb.append("=====================\n");

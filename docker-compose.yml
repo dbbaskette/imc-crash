@@ -32,6 +32,7 @@ services:
       retries: 5
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./db/init-schema.sql:/docker-entrypoint-initdb.d/init-schema.sql
 
   # Impact Analyst MCP Server
   impact-analyst:
@@ -95,6 +96,8 @@ services:
       - "8084:8084"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - GEOAPIFY_API_KEY=${GEOAPIFY_API_KEY:-}
+      - TOMTOM_API_KEY=${TOMTOM_API_KEY:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
       interval: 10s
@@ -117,6 +120,7 @@ services:
       - GMAIL_USERNAME=${GMAIL_USERNAME:-}
       - GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD:-}
       - GMAIL_ADJUSTER_EMAIL=${GMAIL_ADJUSTER_EMAIL:-}
+      - GMAIL_CUSTOMER_EMAIL=${GMAIL_CUSTOMER_EMAIL:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
       interval: 10s
@@ -187,7 +191,7 @@ services:
       - SPRING_RABBITMQ_PASSWORD=guest
       - TELEMATICS_EXCHANGE_NAME=telematics_exchange
       - TELEMATICS_SIMULATION_INTERVAL_MS=5000  # 1 message every 5 seconds per driver
-      - TELEMATICS_SIMULATION_DRIVER_COUNT=3
+      - TELEMATICS_SIMULATION_MAX_DRIVERS=25    # All 25 Metro Atlanta drivers from drivers.json
       - TELEMATICS_SIMULATION_CRASH_FREQUENCY=10  # Crash every 10 messages (frequent for testing)
       - TELEMATICS_SIMULATION_MIN_CRASH_GFORCE=2.5
       - SERVER_PORT=8087

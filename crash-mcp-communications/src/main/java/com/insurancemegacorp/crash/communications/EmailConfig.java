@@ -19,6 +19,7 @@ public class EmailConfig {
     private String username;
     private String appPassword;
     private String adjusterEmail;
+    private String customerEmail;  // For demo: single customer email address for all customers
     private boolean enabled = true;
 
     @PostConstruct
@@ -67,6 +68,18 @@ public class EmailConfig {
 
     public void setAdjusterEmail(String adjusterEmail) {
         this.adjusterEmail = adjusterEmail;
+    }
+
+    public String getCustomerEmail() {
+        return customerEmail;
+    }
+
+    public void setCustomerEmail(String customerEmail) {
+        this.customerEmail = customerEmail;
+    }
+
+    public boolean hasCustomerEmail() {
+        return customerEmail != null && !customerEmail.isBlank();
     }
 
     public void setEnabled(boolean enabled) {

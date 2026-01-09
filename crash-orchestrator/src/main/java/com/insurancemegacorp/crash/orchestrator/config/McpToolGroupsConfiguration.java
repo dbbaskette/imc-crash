@@ -135,7 +135,7 @@ public class McpToolGroupsConfiguration {
     public ToolGroup communicationsToolGroup() {
         return new McpToolGroup(
             ToolGroupDescription.Companion.invoke(
-                "Handles driver and adjuster communications including SMS, push notifications, " +
+                "Handles driver and adjuster communications including SMS, email, push notifications, " +
                 "and roadside assistance dispatch.",
                 "communications-tools"
             ),
@@ -148,6 +148,8 @@ public class McpToolGroupsConfiguration {
                 return toolName.equals("sendSms") ||
                        toolName.equals("sendPushNotification") ||
                        toolName.equals("notifyAdjuster") ||
+                       toolName.equals("sendFnolEmail") ||
+                       toolName.equals("sendCustomerFollowupEmail") ||
                        toolName.equals("dispatchRoadsideAssistance") ||
                        toolName.equals("logCommunicationEvent") ||
                        toolName.equals("getFullCommunicationsStatus");

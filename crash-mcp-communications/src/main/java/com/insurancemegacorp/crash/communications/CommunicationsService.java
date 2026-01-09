@@ -450,6 +450,212 @@ public class CommunicationsService {
     }
 
     /**
+     * Send follow-up email to customer with claim details and service recommendations.
+     * Uses Gmail SMTP when configured, otherwise simulates the send.
+     */
+    @McpTool(description = "Send follow-up email to customer with claim details, next steps, and recommended services " +
+                          "(body shops, tow services, rentals, etc). Call this AFTER gathering all service information.")
+    public EmailResult sendCustomerFollowupEmail(
+            @McpToolParam(description = "Claim reference number")
+            String claimReference,
+
+            @McpToolParam(description = "Customer's full name")
+            String customerName,
+
+            @McpToolParam(description = "Policy number")
+            String policyNumber,
+
+            @McpToolParam(description = "Accident severity: MINOR, MODERATE, SEVERE")
+            String severity,
+
+            @McpToolParam(description = "Assigned adjuster name and contact info")
+            String adjusterInfo,
+
+            @McpToolParam(description = "Body shops section - formatted list of recommended body shops near customer home")
+            String bodyShopsInfo,
+
+            @McpToolParam(description = "Tow services section - formatted list if vehicle needs towing")
+            String towServicesInfo,
+
+            @McpToolParam(description = "Rental car section - formatted list of nearby rental locations")
+            String rentalCarsInfo,
+
+            @McpToolParam(description = "Medical facilities section - formatted list if injuries reported")
+            String medicalInfo,
+
+            @McpToolParam(description = "Additional next steps or instructions for the customer")
+            String nextSteps
+    ) {
+        Instant sentAt = Instant.now();
+        boolean sent;
+        String messageId;
+        String status;
+
+        String subject = String.format("Insurance Megacorp - Your Claim %s - Next Steps", claimReference);
+
+        String htmlBody = buildCustomerFollowupEmailHtml(claimReference, customerName, policyNumber, severity,
+                adjusterInfo, bodyShopsInfo, towServicesInfo, rentalCarsInfo, medicalInfo, nextSteps, sentAt);
+
+        // Determine recipient - use demo customer email if configured, otherwise simulate
+        String recipientEmail = emailConfig.hasCustomerEmail() ? emailConfig.getCustomerEmail() : null;
+
+        if (emailConfig.isEnabled() && recipientEmail != null) {
+            try {
+                MimeMessage message = mailSender.createMimeMessage();
+                MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+                helper.setFrom(emailConfig.getUsername());
+                helper.setTo(recipientEmail);
+                helper.setSubject(subject);
+                helper.setText(htmlBody, true);
+
+                mailSender.send(message);
+
+                messageId = "CUST-EMAIL-" + System.currentTimeMillis();
+                status = "SENT";
+                sent = true;
+
+                log.info("Customer follow-up email sent to {} for claim {}", recipientEmail, claimReference);
+
+            } catch (Exception e) {
+                log.error("Failed to send customer follow-up email for claim {}: {}", claimReference, e.getMessage(), e);
+                messageId = "FAILED-" + System.currentTimeMillis();
+                status = "FAILED: " + e.getMessage();
+                sent = false;
+            }
+        } else {
+            log.info("Simulating customer follow-up email for claim {} (customer email: {})",
+                    claimReference, recipientEmail != null ? recipientEmail : "not configured");
+            log.debug("Email subject: {}", subject);
+            messageId = "SIM-" + System.currentTimeMillis();
+            status = "SIMULATED";
+            sent = true;
+        }
+
+        logCommunication(claimReference, new CommunicationLog(
+            sentAt,
+            "EMAIL",
+            "OUTBOUND",
+            recipientEmail != null ? recipientEmail : "customer@simulated.com",
+            "Customer follow-up: " + truncate(subject, 50),
+            sent
+        ));
+
+        return new EmailResult(
+            sent || status.equals("SIMULATED"),
+            sentAt,
+            messageId,
+            status,
+            recipientEmail != null ? recipientEmail : "simulated"
+        );
+    }
+
+    private String buildCustomerFollowupEmailHtml(String claimReference, String customerName, String policyNumber,
+                                                   String severity, String adjusterInfo, String bodyShopsInfo,
+                                                   String towServicesInfo, String rentalCarsInfo, String medicalInfo,
+                                                   String nextSteps, Instant timestamp) {
+        StringBuilder sectionsHtml = new StringBuilder();
+
+        // Add service sections only if they have content
+        if (medicalInfo != null && !medicalInfo.isBlank()) {
+            sectionsHtml.append(buildServiceSection("Medical Facilities", medicalInfo, "#dc3545"));
+        }
+        if (towServicesInfo != null && !towServicesInfo.isBlank()) {
+            sectionsHtml.append(buildServiceSection("Tow Services", towServicesInfo, "#ff9800"));
+        }
+        if (bodyShopsInfo != null && !bodyShopsInfo.isBlank()) {
+            sectionsHtml.append(buildServiceSection("Recommended Body Shops", bodyShopsInfo, "#2196f3"));
+        }
+        if (rentalCarsInfo != null && !rentalCarsInfo.isBlank()) {
+            sectionsHtml.append(buildServiceSection("Rental Car Locations", rentalCarsInfo, "#4caf50"));
+        }
+
+        String severityColor = switch (severity.toUpperCase()) {
+            case "SEVERE" -> "#dc3545";
+            case "MODERATE" -> "#ffc107";
+            default -> "#28a745";
+        };
+
+        return String.format("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }
+                    .header { background: #1a237e; color: white; padding: 20px; text-align: center; }
+                    .header h1 { margin: 0; font-size: 24px; }
+                    .content { padding: 20px; }
+                    .greeting { font-size: 18px; margin-bottom: 20px; }
+                    .claim-box { background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 15px 0; }
+                    .claim-box p { margin: 5px 0; }
+                    .severity-badge { display: inline-block; padding: 4px 12px; border-radius: 4px; color: white; font-weight: bold; font-size: 12px; }
+                    .section { margin: 20px 0; border-left: 4px solid #ddd; padding-left: 15px; }
+                    .section h3 { margin: 0 0 10px 0; color: #333; }
+                    .section-content { white-space: pre-wrap; font-size: 14px; }
+                    .adjuster-box { background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0; }
+                    .next-steps { background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0; }
+                    .next-steps h3 { color: #e65100; margin-top: 0; }
+                    .footer { background: #f5f5f5; padding: 15px; font-size: 12px; color: #666; text-align: center; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>Insurance Megacorp</h1>
+                    <p>Claims Support Team</p>
+                </div>
+                <div class="content">
+                    <p class="greeting">Dear %s,</p>
+                    <p>We hope you're safe following the incident. Your claim has been automatically created and an adjuster has been assigned to assist you.</p>
+
+                    <div class="claim-box">
+                        <p><strong>Claim Reference:</strong> %s</p>
+                        <p><strong>Policy Number:</strong> %s</p>
+                        <p><strong>Incident Severity:</strong> <span class="severity-badge" style="background: %s;">%s</span></p>
+                        <p><strong>Report Time:</strong> %s</p>
+                    </div>
+
+                    <div class="adjuster-box">
+                        <h3>Your Claims Adjuster</h3>
+                        <p>%s</p>
+                        <p>Your adjuster will be in touch within 24 hours to discuss your claim.</p>
+                    </div>
+
+                    %s
+
+                    <div class="next-steps">
+                        <h3>Next Steps</h3>
+                        <div class="section-content">%s</div>
+                    </div>
+
+                    <p>If you have any immediate questions, please don't hesitate to contact us.</p>
+                    <p>Best regards,<br>Insurance Megacorp Claims Team</p>
+                </div>
+                <div class="footer">
+                    <p>This email was automatically generated by our CRASH (Claims Response Agent System Hive) system.</p>
+                    <p>Insurance Megacorp | Claims Department | 1-800-555-CLAIM</p>
+                </div>
+            </body>
+            </html>
+            """,
+            customerName,
+            claimReference, policyNumber, severityColor, severity.toUpperCase(),
+            EMAIL_DATE_FORMAT.format(timestamp),
+            adjusterInfo != null ? adjusterInfo : "An adjuster will be assigned shortly.",
+            sectionsHtml.toString(),
+            nextSteps != null ? nextSteps.replace("\n", "<br>") : "Your adjuster will contact you with next steps."
+        );
+    }
+
+    private String buildServiceSection(String title, String content, String borderColor) {
+        return String.format("""
+            <div class="section" style="border-left-color: %s;">
+                <h3>%s</h3>
+                <div class="section-content">%s</div>
+            </div>
+            """, borderColor, title, content.replace("\n", "<br>"));
+    }
+
+    /**
      * Log a communication event.
      */
     @McpTool(description = "Log a communication event for audit trail.")
@@ -502,7 +708,8 @@ public class CommunicationsService {
         String smsContent = String.format(
             "Hi %s, we detected a possible accident. Are you okay? " +
             "Reply YES if safe, or call 911 if you need emergency help. " +
-            "Your claim has been started automatically. - Insurance Megacorp",
+            "Your claim has been started automatically. " +
+            "Check your email for full details and next steps. - Insurance Megacorp",
             driverName.split(" ")[0]
         );
         

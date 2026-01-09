@@ -15,9 +15,10 @@ spring:
           mcp-endpoint: /mcp
         instructions: |
           Services Agent - Finds nearby services relevant to accident response.
-          
+          Uses Geoapify Places API for real location lookups.
+
           Available tools:
-          - find_body_shops: Find nearby auto body repair shops
+          - find_body_shops: Find nearby auto body repair shops (REAL API)
           - find_tow_services: Find nearby tow truck services with ETAs
           - find_medical_facilities: Find nearby hospitals and urgent care
           - find_rental_cars: Find nearby rental car locations
@@ -26,6 +27,19 @@ spring:
           tool: true
           resource: false
           prompt: false
+
+# Geoapify Places API Configuration (body shops, hospitals, car rentals)
+# Get your free API key at: https://myprojects.geoapify.com/
+# Free tier: 3,000 requests/day
+geoapify:
+  api-key: ${GEOAPIFY_API_KEY:}
+
+# TomTom Search API Configuration (tow truck services)
+# Get your free API key at: https://developer.tomtom.com/
+# Free tier: 2,500 requests/day
+# Uses category 7317 (Tow Truck Service)
+tomtom:
+  api-key: ${TOMTOM_API_KEY:}
 
 management:
   endpoints:

@@ -13,6 +13,19 @@ google:
   api_key: "YOUR_GOOGLE_API_KEY"
   model: "gemini-2.5-flash"
 
+# Geoapify Configuration (for Services agent - body shops, hospitals, car rentals)
+# Get your free API key at: https://myprojects.geoapify.com/
+# Free tier: 3,000 requests/day
+geoapify:
+  api_key: ""
+
+# TomTom Configuration (for Services agent - tow truck lookups)
+# Get your free API key at: https://developer.tomtom.com/
+# Free tier: 2,500 requests/day
+# Used for category 7317 (Tow Truck Service) - Geoapify doesn't have towing
+tomtom:
+  api_key: ""
+
 # Optional: OpenAI Configuration
 openai:
   api_key: ""
@@ -38,6 +51,7 @@ gmail:
   username: ""           # Your Gmail address (e.g., yourname@gmail.com)
   app_password: ""       # Gmail App Password (16 characters, no spaces)
   adjuster_email: ""     # Recipient email for FNOL reports (e.g., adjuster@company.com)
+  customer_email: ""     # Customer email for followup (this is one address for all user emails for demo purposes)
 
 # Service Ports (defaults shown - change if needed)
 ports:

@@ -17,10 +17,13 @@ spring:
           Communications Agent - Handles driver and adjuster communications.
 
           Available tools:
-          - send_sms: Send SMS message to driver
+          - send_sms: Send SMS message to driver (mentions email will follow)
           - send_push_notification: Send push notification via mobile app
           - notify_adjuster: Notify claims adjuster about new claim
-          - send_fnol_email: Send FNOL report email to claims adjuster
+          - send_fnol_email: Send FNOL report email to claims adjuster with full details
+          - send_customer_followup_email: Send follow-up email to customer with claim details,
+            service recommendations (body shops, tow, rentals, medical), and next steps.
+            Call this AFTER gathering service locations from the Services agent.
           - dispatch_roadside_assistance: Dispatch roadside assistance
           - log_communication_event: Log communication for audit trail
           - get_full_communications_status: Get complete communication status
@@ -41,6 +44,7 @@ gmail:
   username: ${GMAIL_USERNAME:}
   app-password: ${GMAIL_APP_PASSWORD:}
   adjuster-email: ${GMAIL_ADJUSTER_EMAIL:}
+  customer-email: ${GMAIL_CUSTOMER_EMAIL:}  # For demo: all customer emails go to this address
 
 spring.mail:
   host: smtp.gmail.com

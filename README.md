@@ -15,7 +15,7 @@ Each agent is an independent microservice that contributes its expertise:
 | **Impact Analyst** | Analyzes telemetry to classify severity and impact type | Rules-based classification + LLM narrative |
 | **Environment** | Gathers weather, road conditions, and location context | Real APIs (Nominatim, Open-Meteo) |
 | **Policy** | Retrieves insurance coverage, driver profile, and vehicle details | PostgreSQL database |
-| **Services** | Locates nearby body shops, tow services, hospitals | Severity-based recommendations |
+| **Services** | Locates nearby body shops, tow services, hospitals, rentals | TomTom + Geoapify APIs |
 | **Communications** | Handles driver outreach, SMS, email, and adjuster alerts | Twilio SMS, Gmail SMTP |
 
 ## Architecture
@@ -41,7 +41,7 @@ flowchart TB
         IA["IMPACT ANALYST<br/><br/>Rules-based Severity<br/>LLM Narrative"]
         ENV["ENVIRONMENT<br/><br/>Nominatim Geocoding<br/>Open-Meteo Weather"]
         POL["POLICY<br/><br/>PostgreSQL Database<br/>Coverage/Driver/Vehicle"]
-        SVC["SERVICES<br/><br/>Nearby Tow/Body/Hospital"]
+        SVC["SERVICES<br/><br/>TomTom/Geoapify APIs<br/>Body/Tow/Hospital/Rental"]
         COM["COMMUNICATIONS<br/><br/>Twilio SMS<br/>Gmail Email"]
     end
 
@@ -58,10 +58,12 @@ flowchart TB
 - **Spring AI** — Model Context Protocol (MCP) for agent communication
 - **Spring Boot 3.5.x** — Microservice foundation
 - **Google Gemini** — LLM for reasoning, planning, and narrative generation
+- **TomTom Search API** — Real nearby services (body shops, tow, hospitals, rentals) with phone numbers
+- **Geoapify Places API** — Fallback for nearby services location
 - **Open-Meteo API** — Real weather data including 24-hour historical analysis
 - **OpenStreetMap Nominatim** — Real reverse geocoding for accident location addresses
 - **Twilio** — SMS notifications to drivers
-- **Gmail SMTP** — FNOL email reports to adjusters
+- **Gmail SMTP** — FNOL email reports to adjusters and customer follow-up emails
 - **RabbitMQ** — Message broker with publisher confirms
 - **PostgreSQL** — Policy data storage and FNOL report persistence
 
@@ -133,11 +135,14 @@ flowchart TB
 | **Environment** | Reverse Geocoding | **REAL** | OpenStreetMap Nominatim API |
 | **Environment** | Weather | **REAL** | Open-Meteo API + 24hr history |
 | **Communications** | SMS | **REAL** | Twilio SDK |
-| **Communications** | Email | **REAL** | Gmail SMTP |
+| **Communications** | Email | **REAL** | Gmail SMTP (adjuster + customer emails) |
 | **Policy** | Policy/Driver/Vehicle | **REAL** | PostgreSQL database |
 | **Impact Analyst** | Severity Classification | Rules-based | Threshold algorithm |
 | **Impact Analyst** | Narrative Generation | **REAL** | LLM-generated |
-| **Services** | Body Shops/Tow/Hospitals | Simulated | Mock data |
+| **Services** | Body Shops | **REAL** | TomTom API (Geoapify fallback) |
+| **Services** | Tow Services | **REAL** | TomTom API with ETA calculation |
+| **Services** | Hospitals | **REAL** | TomTom API (Geoapify fallback) |
+| **Services** | Rental Cars | **REAL** | TomTom API (Geoapify fallback) |
 | **Orchestrator** | GOAP Planning | **REAL** | Embabel Agent Framework |
 | **Orchestrator** | LLM Reasoning | **REAL** | Google Gemini |
 

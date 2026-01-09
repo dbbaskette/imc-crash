@@ -63,6 +63,14 @@ public class OrchestratorSink {
                 // Map to AccidentEvent for FNOL processing
                 AccidentEvent event = telemetryMapper.toAccidentEvent(telemetry);
 
+                // Check if this should be processed as an accident BEFORE detailed logging
+                if (!fnolService.shouldProcess(event.gForce())) {
+                    log.debug("Telemetry event: g-force={}, skipping (below {} threshold)",
+                            String.format("%.2f", event.gForce()), "2.5g");
+                    return null;
+                }
+
+                // Only log detailed info for actual accidents (above threshold)
                 log.info("========================================");
                 log.info("ACCIDENT EVENT RECEIVED");
                 log.info("========================================");
@@ -84,12 +92,6 @@ public class OrchestratorSink {
                 log.info("ABS:          {}", telemetry.absEngaged() != null && telemetry.absEngaged() ? "ENGAGED" : "OK");
                 log.info("Hazards:      {}", telemetry.hazardLightsOn() != null && telemetry.hazardLightsOn() ? "ON" : "OFF");
                 log.info("========================================");
-
-                // Check if this should be processed as an accident
-                if (!fnolService.shouldProcess(event.gForce())) {
-                    log.info("G-force below threshold, skipping FNOL processing");
-                    return null;
-                }
 
                 // Phase 3: Process through Embabel agents
                 FNOLReport report = fnolService.processAccident(event);

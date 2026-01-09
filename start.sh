@@ -129,6 +129,7 @@ if [ -f "$VARS_FILE" ]; then
     GMAIL_USERNAME=$(parse_yaml_value "$VARS_FILE" "gmail" "username")
     GMAIL_APP_PASSWORD=$(parse_yaml_value "$VARS_FILE" "gmail" "app_password")
     GMAIL_ADJUSTER_EMAIL=$(parse_yaml_value "$VARS_FILE" "gmail" "adjuster_email")
+    GMAIL_CUSTOMER_EMAIL=$(parse_yaml_value "$VARS_FILE" "gmail" "customer_email")
 
     if [ -n "$GMAIL_USERNAME" ] && [ -n "$GMAIL_APP_PASSWORD" ]; then
         echo "" >> "$ENV_FILE"
@@ -144,8 +145,37 @@ if [ -f "$VARS_FILE" ]; then
         else
             echo -e "  ${YELLOW}⚠${NC} GMAIL_ADJUSTER_EMAIL not set (will use default)"
         fi
+
+        if [ -n "$GMAIL_CUSTOMER_EMAIL" ]; then
+            echo "GMAIL_CUSTOMER_EMAIL=${GMAIL_CUSTOMER_EMAIL}" >> "$ENV_FILE"
+            echo -e "  ${GREEN}✓${NC} GMAIL_CUSTOMER_EMAIL (demo: all customer emails go here)"
+        else
+            echo -e "  ${YELLOW}⚠${NC} GMAIL_CUSTOMER_EMAIL not set (customer emails will be simulated)"
+        fi
     else
         echo -e "  ${YELLOW}⚠${NC} Gmail not configured (emails will be simulated)"
+    fi
+
+    # Geoapify Configuration (for Services agent - body shops, hospitals, car rentals)
+    GEOAPIFY_API_KEY=$(parse_yaml_value "$VARS_FILE" "geoapify" "api_key")
+    if [ -n "$GEOAPIFY_API_KEY" ]; then
+        echo "" >> "$ENV_FILE"
+        echo "# Geoapify Configuration (body shops, hospitals, car rentals)" >> "$ENV_FILE"
+        echo "GEOAPIFY_API_KEY=${GEOAPIFY_API_KEY}" >> "$ENV_FILE"
+        echo -e "  ${GREEN}✓${NC} GEOAPIFY_API_KEY"
+    else
+        echo -e "  ${YELLOW}⚠${NC} Geoapify not configured (body shops, hospitals, rentals will use simulated data)"
+    fi
+
+    # TomTom Configuration (for Services agent - tow truck lookups)
+    TOMTOM_API_KEY=$(parse_yaml_value "$VARS_FILE" "tomtom" "api_key")
+    if [ -n "$TOMTOM_API_KEY" ]; then
+        echo "" >> "$ENV_FILE"
+        echo "# TomTom Configuration (tow truck services)" >> "$ENV_FILE"
+        echo "TOMTOM_API_KEY=${TOMTOM_API_KEY}" >> "$ENV_FILE"
+        echo -e "  ${GREEN}✓${NC} TOMTOM_API_KEY"
+    else
+        echo -e "  ${YELLOW}⚠${NC} TomTom not configured (tow services will use simulated data)"
     fi
 
     echo ""
@@ -172,6 +202,15 @@ if [ "$1" == "--build" ] || [ "$1" == "-b" ]; then
     echo -e "${GREEN}✓ Build complete${NC}"
 fi
 
+# Check if --reset-db flag is passed or if database needs initialization
+if [ "$1" == "--reset-db" ] || [ "$2" == "--reset-db" ]; then
+    echo
+    echo -e "${YELLOW}Resetting database (removing postgres_data volume)...${NC}"
+    docker-compose down -v 2>/dev/null || true
+    docker volume rm imc-crash_postgres_data 2>/dev/null || true
+    echo -e "${GREEN}✓ Database volume removed - will reinitialize with schema${NC}"
+fi
+
 echo
 echo -e "${YELLOW}Starting Docker containers...${NC}"
 echo
@@ -195,4 +234,7 @@ echo
 echo "To check status:  docker-compose ps"
 echo "To view logs:     docker-compose logs -f"
 echo "To stop:          ./stop.sh"
+echo
+echo -e "${YELLOW}NOTE:${NC} If driver/policy lookups show 'Unknown Driver',"
+echo "      run: ./start.sh --reset-db to reinitialize the database"
 echo

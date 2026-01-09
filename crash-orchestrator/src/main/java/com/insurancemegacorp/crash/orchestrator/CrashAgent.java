@@ -274,12 +274,12 @@ public class CrashAgent {
     }
 
     /**
-     * Final Action: Send FNOL email to adjuster and return the report.
-     * This is the goal - achieves the workflow by sending the compiled report via email.
+     * Final Action: Send FNOL email to adjuster AND customer follow-up email, then return the report.
+     * This is the goal - achieves the workflow by sending both emails.
      */
-    @AchievesGoal(description = "Generate complete First Notice of Loss report and email to adjuster")
+    @AchievesGoal(description = "Generate complete First Notice of Loss report and email to adjuster and customer")
     @Action(
-        description = "Email the compiled FNOL report to the claims adjuster and return the report",
+        description = "Email the compiled FNOL report to the claims adjuster and customer, then return the report",
         toolGroups = {"communications-tools"}
     )
     public FNOLReport sendFnolToAdjuster(
@@ -292,7 +292,7 @@ public class CrashAgent {
         // Build the report content for the email
         String reportContent = buildEmailReportContent(report);
 
-        // Call notifyAdjuster with the full FNOL report
+        // 1. Send adjuster notification email
         try {
             ai.withAutoLlm().createObject(
                 """
@@ -312,13 +312,121 @@ public class CrashAgent {
                 ),
                 EmailConfirmation.class
             );
-            log.info("FNOL email sent for claim: {}", report.claimNumber());
+            log.info("FNOL email sent to adjuster for claim: {}", report.claimNumber());
         } catch (Exception e) {
-            log.error("Failed to send FNOL email for claim {}: {}", report.claimNumber(), e.getMessage());
+            log.error("Failed to send adjuster FNOL email for claim {}: {}", report.claimNumber(), e.getMessage());
+        }
+
+        // 2. Send customer follow-up email with claim details and service recommendations
+        try {
+            log.info("Preparing customer follow-up email for claim: {}", report.claimNumber());
+
+            String adjusterInfo = report.impact().severity() == ImpactAnalysis.Severity.SEVERE
+                ? "Sarah Martinez (Senior Adjuster) - Priority: HIGH\nPhone: 1-800-555-2583\nEmail: sarah.martinez@insurancemegacorp.com"
+                : "Mike Johnson (Adjuster) - Priority: MEDIUM\nPhone: 1-800-555-2584\nEmail: mike.johnson@insurancemegacorp.com";
+
+            String bodyShopsInfo = buildServiceListForEmail(report.services().bodyShops(), "body shop");
+            String towServicesInfo = buildServiceListForEmail(report.services().towServices(), "tow service");
+            String rentalCarsInfo = buildServiceListForEmail(report.services().rentalCarLocations(), "rental");
+            String medicalInfo = buildServiceListForEmail(report.services().medicalFacilities(), "medical");
+
+            log.debug("Customer email services - bodyShops: {} chars, towServices: {} chars, rentals: {} chars, medical: {} chars",
+                    bodyShopsInfo.length(), towServicesInfo.length(), rentalCarsInfo.length(), medicalInfo.length());
+
+            String nextSteps = buildCustomerNextSteps(report);
+
+            log.info("Calling sendCustomerFollowupEmail tool for customer: {}", report.policy().driver().name());
+            ai.withAutoLlm().createObject(
+                """
+                Call the sendCustomerFollowupEmail tool to send a follow-up email to the customer.
+
+                Use these parameters:
+                - claimReference: "%s"
+                - customerName: "%s"
+                - policyNumber: "%s"
+                - severity: "%s"
+                - adjusterInfo: "%s"
+                - bodyShopsInfo: "%s"
+                - towServicesInfo: "%s"
+                - rentalCarsInfo: "%s"
+                - medicalInfo: "%s"
+                - nextSteps: "%s"
+
+                This will email the customer with their claim details and recommended services.
+                Return confirmation of the email.
+                """.formatted(
+                    report.claimNumber(),
+                    report.policy().driver().name(),
+                    report.policy().policy().policyNumber(),
+                    report.impact().severity().name(),
+                    adjusterInfo.replace("\"", "\\\"").replace("\n", "\\n"),
+                    bodyShopsInfo.replace("\"", "\\\"").replace("\n", "\\n"),
+                    towServicesInfo.replace("\"", "\\\"").replace("\n", "\\n"),
+                    rentalCarsInfo.replace("\"", "\\\"").replace("\n", "\\n"),
+                    medicalInfo.replace("\"", "\\\"").replace("\n", "\\n"),
+                    nextSteps.replace("\"", "\\\"").replace("\n", "\\n")
+                ),
+                EmailConfirmation.class
+            );
+            log.info("Customer follow-up email sent successfully for claim: {}", report.claimNumber());
+        } catch (Exception e) {
+            log.error("Failed to send customer follow-up email for claim {}: {}", report.claimNumber(), e.getMessage(), e);
         }
 
         // Return the original report
         return report;
+    }
+
+    private String buildServiceListForEmail(List<NearbyServices.ServiceLocation> services, String type) {
+        if (services == null || services.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (var svc : services) {
+            sb.append("- ").append(svc.name());
+            if (type.equals("tow service") && svc.etaMinutes() != null) {
+                sb.append(" (ETA: ").append(svc.etaMinutes()).append(" min)");
+            } else {
+                sb.append(" (").append(String.format("%.1f", svc.distanceMiles())).append(" mi)");
+            }
+            // Always show phone line
+            sb.append("\n  Phone: ");
+            if (svc.phone() != null && !svc.phone().isBlank()) {
+                sb.append(svc.phone());
+            } else {
+                sb.append("Call for info");
+            }
+            if (svc.address() != null && !svc.address().isBlank()) {
+                sb.append("\n  Address: ").append(svc.address());
+            }
+            if (svc.isPreferred()) {
+                sb.append("\n  [PREFERRED PROVIDER]");
+            }
+            sb.append("\n\n");
+        }
+        return sb.toString();
+    }
+
+    private String buildCustomerNextSteps(FNOLReport report) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("1. Your adjuster will contact you within 24 hours to discuss your claim.\n\n");
+
+        if (report.services().vehicleLikelyDrivable()) {
+            sb.append("2. Your vehicle appears drivable. Please schedule an inspection at one of our recommended body shops at your convenience.\n\n");
+        } else {
+            sb.append("2. A tow truck has been dispatched. Please wait at a safe location.\n\n");
+            if (report.policy().policy().hasRentalCoverage()) {
+                sb.append("3. Your policy includes rental car coverage. See the rental locations above for options.\n\n");
+            }
+        }
+
+        sb.append("If you need immediate assistance, call our 24/7 claims hotline: 1-800-555-CLAIM\n\n");
+
+        if (report.impact().airbagLikely()) {
+            sb.append("IMPORTANT: If you are experiencing any pain or discomfort, please seek medical attention immediately. Medical facilities are listed above.");
+        }
+
+        return sb.toString();
     }
 
     private String buildEmailReportContent(FNOLReport report) {
@@ -410,6 +518,67 @@ public class CrashAgent {
             sb.append("  ⚠ CONSTRUCTION ZONE\n");
         }
         sb.append("\n");
+
+        // Nearby Services section
+        sb.append("NEARBY SERVICES\n");
+        sb.append("===============\n");
+        sb.append("Vehicle Drivable: ").append(report.services().vehicleLikelyDrivable() ? "Yes" : "No").append("\n");
+        sb.append("Dispatch Recommendation: ").append(report.services().dispatchRecommendation()).append("\n\n");
+
+        if (!report.services().bodyShops().isEmpty()) {
+            sb.append("Body Shops:\n");
+            for (var shop : report.services().bodyShops()) {
+                sb.append("  - ").append(shop.name());
+                sb.append(" (").append(String.format("%.1f", shop.distanceMiles())).append(" mi)");
+                sb.append(" - ").append(shop.phone() != null && !shop.phone().isBlank() ? shop.phone() : "Call for info");
+                if (shop.isPreferred()) {
+                    sb.append(" [PREFERRED]");
+                }
+                sb.append("\n");
+            }
+            sb.append("\n");
+        }
+
+        if (!report.services().towServices().isEmpty()) {
+            sb.append("Tow Services:\n");
+            for (var tow : report.services().towServices()) {
+                sb.append("  - ").append(tow.name());
+                if (tow.etaMinutes() != null) {
+                    sb.append(" (ETA: ").append(tow.etaMinutes()).append(" min)");
+                }
+                sb.append(" - ").append(tow.phone() != null && !tow.phone().isBlank() ? tow.phone() : "Call for info");
+                if (tow.isPreferred()) {
+                    sb.append(" [PREFERRED]");
+                }
+                sb.append("\n");
+            }
+            sb.append("\n");
+        }
+
+        if (!report.services().medicalFacilities().isEmpty()) {
+            sb.append("Medical Facilities:\n");
+            for (var med : report.services().medicalFacilities()) {
+                sb.append("  - ").append(med.name());
+                sb.append(" (").append(String.format("%.1f", med.distanceMiles())).append(" mi)");
+                sb.append(" - ").append(med.phone() != null && !med.phone().isBlank() ? med.phone() : "Call for info");
+                sb.append("\n");
+            }
+            sb.append("\n");
+        }
+
+        if (!report.services().rentalCarLocations().isEmpty()) {
+            sb.append("Rental Cars:\n");
+            for (var rental : report.services().rentalCarLocations()) {
+                sb.append("  - ").append(rental.name());
+                sb.append(" (").append(String.format("%.1f", rental.distanceMiles())).append(" mi)");
+                sb.append(" - ").append(rental.phone() != null && !rental.phone().isBlank() ? rental.phone() : "Call for info");
+                if (rental.isPreferred()) {
+                    sb.append(" [PREFERRED]");
+                }
+                sb.append("\n");
+            }
+            sb.append("\n");
+        }
 
         sb.append("RECOMMENDED ACTIONS\n");
         sb.append("================\n");

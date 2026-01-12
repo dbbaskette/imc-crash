@@ -1,4 +1,4 @@
-package com.insurancemegacorp.crash.orchestrator;
+package com.insurancemegacorp.crash.sink;
 
 import com.insurancemegacorp.crash.domain.AccidentEvent;
 import org.springframework.stereotype.Component;
@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 
 /**
- * Maps TelemetryMessage from RabbitMQ to AccidentEvent for FNOL processing.
+ * Maps TelemetryMessage from RabbitMQ to AccidentEvent for orchestrator processing.
  */
 @Component
 public class TelemetryToAccidentMapper {

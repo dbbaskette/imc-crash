@@ -1,4 +1,4 @@
-package com.insurancemegacorp.crash.orchestrator;
+package com.insurancemegacorp.crash.sink;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -64,7 +64,7 @@ public record TelemetryMessage(
     @JsonProperty("doors_locked") Boolean doorsLocked,
     @JsonProperty("hazard_lights_on") Boolean hazardLightsOn,
 
-    // Accident metadata (added by telematics generator for crash events)
+    // Accident metadata
     @JsonProperty("accident_type") String accidentType
 ) {
     /**
@@ -75,20 +75,6 @@ public record TelemetryMessage(
             accelerometerX * accelerometerX +
             accelerometerY * accelerometerY +
             accelerometerZ * accelerometerZ
-        );
-    }
-
-    /**
-     * Calculate the 3D gyroscope magnitude (if available).
-     */
-    public Double gyroscopeMagnitude() {
-        if (gyroscopeX == null || gyroscopeY == null || gyroscopeZ == null) {
-            return null;
-        }
-        return Math.sqrt(
-            gyroscopeX * gyroscopeX +
-            gyroscopeY * gyroscopeY +
-            gyroscopeZ * gyroscopeZ
         );
     }
 

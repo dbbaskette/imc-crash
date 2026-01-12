@@ -113,6 +113,10 @@ services:
       - "8085:8085"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/crash
+      - SPRING_DATASOURCE_USERNAME=crash
+      - SPRING_DATASOURCE_PASSWORD=crash
+      - DEMO_MODE=${DEMO_MODE:-true}
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
       - TWILIO_FROM_NUMBER=${TWILIO_FROM_NUMBER:-}
@@ -121,13 +125,17 @@ services:
       - GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD:-}
       - GMAIL_ADJUSTER_EMAIL=${GMAIL_ADJUSTER_EMAIL:-}
       - GMAIL_CUSTOMER_EMAIL=${GMAIL_CUSTOMER_EMAIL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 3
 
-  # CRASH Orchestrator (Embabel) - for direct API testing
+  # CRASH Orchestrator (Embabel) - FNOL processing engine with WebSocket
+  # Receives accidents from crash-sink via HTTP, processes through GOAP agent
   orchestrator:
     build:
       context: ./crash-orchestrator
@@ -136,15 +144,11 @@ services:
       - "8080:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - SERVER_PORT=8080
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - GOOGLE_MODEL=${GOOGLE_MODEL:-gemini-2.5-flash}
-      # RabbitMQ connection
-      - SPRING_RABBITMQ_HOST=rabbitmq
-      - SPRING_RABBITMQ_PORT=5672
-      - SPRING_RABBITMQ_USERNAME=guest
-      - SPRING_RABBITMQ_PASSWORD=guest
       # PostgreSQL connection
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/crash
       - SPRING_DATASOURCE_USERNAME=crash
@@ -157,8 +161,6 @@ services:
       - MCP_COMMUNICATIONS_URL=http://communications:8085
     depends_on:
       postgres:
-        condition: service_healthy
-      rabbitmq:
         condition: service_healthy
       impact-analyst:
         condition: service_healthy
@@ -204,48 +206,27 @@ services:
       timeout: 5s
       retries: 5
 
-  # CRASH RabbitMQ Sink - consumes from queue, generates FNOL
+  # CRASH Sink - Lightweight RabbitMQ consumer (horizontally scalable)
+  # Filters telemetry for accidents and forwards to orchestrator via HTTP
   crash-sink:
     build:
-      context: ./crash-orchestrator
+      context: ./crash-sink
       dockerfile: Dockerfile
     ports:
       - "8086:8086"
     environment:
-      - SPRING_PROFILES_ACTIVE=local
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - GOOGLE_MODEL=${GOOGLE_MODEL:-gemini-2.5-flash}
+      - SERVER_PORT=8086
       # RabbitMQ connection
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_PORT=5672
       - SPRING_RABBITMQ_USERNAME=guest
       - SPRING_RABBITMQ_PASSWORD=guest
-      # PostgreSQL connection
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/crash
-      - SPRING_DATASOURCE_USERNAME=crash
-      - SPRING_DATASOURCE_PASSWORD=crash
-      # MCP agent connections
-      - MCP_IMPACT_ANALYST_URL=http://impact-analyst:8081
-      - MCP_ENVIRONMENT_URL=http://environment:8082
-      - MCP_POLICY_URL=http://policy:8083
-      - MCP_SERVICES_URL=http://services-agent:8084
-      - MCP_COMMUNICATIONS_URL=http://communications:8085
+      # Orchestrator URL for forwarding accidents
+      - ORCHESTRATOR_URL=http://orchestrator:8080
     depends_on:
       rabbitmq:
         condition: service_healthy
-      postgres:
-        condition: service_healthy
-      impact-analyst:
-        condition: service_healthy
-      environment:
-        condition: service_healthy
-      policy:
-        condition: service_healthy
-      services-agent:
-        condition: service_healthy
-      communications:
+      orchestrator:
         condition: service_healthy
       telematics-gen:
         condition: service_healthy
@@ -254,6 +235,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # CRASH UI - React/Vite application for demo visualization
+  crash-ui:
+    build:
+      context: ./crash-ui
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+      communications:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
 networks:
   default:

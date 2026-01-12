@@ -1,44 +1,6 @@
 spring:
   application:
-    name: crash-rabbitmq-sink
-
-  # Spring Cloud Stream configuration
-  cloud:
-    function:
-      definition: processTelemetry
-    stream:
-      bindings:
-        # Input: Vehicle accident events from telemetry exchange
-        processTelemetry-in-0:
-          destination: ${TELEMETRY_INPUT_DESTINATION:telematics_exchange}
-          group: ${TELEMETRY_INPUT_GROUP:crash-sink-group}
-          consumer:
-            concurrency: ${CONSUMER_CONCURRENCY:1}
-
-        # Output 0: vehicle_events queue (original format for JDBC Sink compatibility)
-        processTelemetry-out-0:
-          destination: ${VEHICLE_EVENTS_DESTINATION:vehicle_events}
-
-        # Output 1: fnol_reports queue (enriched reports for claims systems)
-        processTelemetry-out-1:
-          destination: ${FNOL_REPORTS_DESTINATION:fnol_reports}
-
-      rabbit:
-        bindings:
-          processTelemetry-in-0:
-            consumer:
-              exchangeType: fanout
-              bindingRoutingKey: "#"
-
-          processTelemetry-out-0:
-            producer:
-              exchangeType: topic
-              routingKeyExpression: "headers.containsKey('severity') ? 'vehicle.accident.' + headers['severity'].toString().toLowerCase() : 'vehicle.accident.unknown'"
-
-          processTelemetry-out-1:
-            producer:
-              exchangeType: topic
-              routingKeyExpression: "headers.containsKey('severity') ? 'fnol.' + headers['severity'].toString().toLowerCase() : 'fnol.unknown'"
+    name: crash-orchestrator
 
   # JPA/Database configuration
   datasource:
@@ -110,11 +72,11 @@ embabel:
   agent:
     platform:
       scanning:
-        packages: com.embabel.agent,com.insurancemegacorp.crashsink
+        packages: com.embabel.agent,com.insurancemegacorp.crash.orchestrator
 
 # Server configuration
 server:
-  port: ${PORT:8086}
+  port: ${PORT:8080}
 
 # Actuator/Management endpoints
 management:
@@ -137,24 +99,3 @@ logging:
     org.springframework.ai: DEBUG
     org.springframework.ai.openai: TRACE
     org.springframework.web.client: DEBUG
-    org.springframework.cloud.stream: INFO
-
----
-# Local/Docker profile
-spring:
-  config:
-    activate:
-      on-profile: local
-  rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
-
----
-# Cloud Foundry profile
-spring:
-  config:
-    activate:
-      on-profile: cloud
-  # CF will auto-configure RabbitMQ and PostgreSQL from bound services

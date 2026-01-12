@@ -6,6 +6,7 @@
 -- =============================================================================
 
 -- Drop existing tables if they exist
+DROP TABLE IF EXISTS messages CASCADE;
 DROP TABLE IF EXISTS drivers CASCADE;
 DROP TABLE IF EXISTS vehicles CASCADE;
 DROP TABLE IF EXISTS policies CASCADE;
@@ -94,6 +95,29 @@ CREATE INDEX idx_policies_policy_id ON policies(policy_id);
 CREATE INDEX idx_vehicles_policy_id ON vehicles(policy_id);
 CREATE INDEX idx_drivers_policy_id ON drivers(policy_id);
 CREATE INDEX idx_drivers_driver_id ON drivers(driver_id);
+
+-- =============================================================================
+-- Messages table (for demo mode - stores intercepted emails and SMS)
+-- =============================================================================
+CREATE TABLE messages (
+    id BIGSERIAL PRIMARY KEY,
+    message_type VARCHAR(20) NOT NULL CHECK (message_type IN ('EMAIL', 'SMS', 'PUSH')),
+    recipient_type VARCHAR(20) NOT NULL CHECK (recipient_type IN ('ADJUSTER', 'CUSTOMER')),
+    recipient_identifier VARCHAR(255),
+    claim_reference VARCHAR(100),
+    subject VARCHAR(500),
+    body TEXT,
+    sent_at TIMESTAMP NOT NULL,
+    customer_name VARCHAR(255),
+    policy_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for message queries
+CREATE INDEX idx_messages_claim ON messages(claim_reference);
+CREATE INDEX idx_messages_recipient ON messages(recipient_type, recipient_identifier);
+CREATE INDEX idx_messages_sent_at ON messages(sent_at DESC);
+CREATE INDEX idx_messages_customer ON messages(customer_name);
 
 -- =============================================================================
 -- Sample Data - Matches telematics generator drivers.json

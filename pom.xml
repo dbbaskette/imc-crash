@@ -20,6 +20,7 @@
         <module>crash-mcp-services</module>
         <module>crash-mcp-communications</module>
         <module>crash-orchestrator</module>
+        <module>crash-sink</module>
     </modules>
 
     <properties>

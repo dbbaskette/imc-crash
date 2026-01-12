@@ -5,13 +5,18 @@ import com.embabel.agent.api.annotation.Action;
 import com.embabel.agent.api.annotation.Agent;
 import com.embabel.agent.api.common.Ai;
 import com.insurancemegacorp.crash.domain.*;
+import com.insurancemegacorp.crash.orchestrator.service.AccidentStatusService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.time.Year;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * CRASH Agent - Orchestrates multiple specialist agents to generate
@@ -27,185 +32,284 @@ public class CrashAgent {
 
     private static final Logger log = LoggerFactory.getLogger(CrashAgent.class);
 
-    /**
-     * Action 1: Analyze the impact using the Impact Analyst MCP server.
-     * This is typically executed first as severity classification affects other actions.
-     */
-    @Action(
-        description = "Analyze accident telemetry to determine severity and impact type",
-        toolGroups = {"impact-analyst-tools"}
-    )
-    public ImpactAnalysis analyzeImpact(AccidentEvent event, Ai ai) {
-        log.info("Analyzing impact for accident: policyId={}, gForce={}", event.policyId(), event.gForce());
-        return ai.withAutoLlm().createObject(
-            """
-            Use the Impact Analyst tools to analyze this accident.
+    private final AccidentStatusService statusService;
 
-            Call the analyze_impact tool with:
-            - gForce: %f
-            - speedMph: %f
-            - speedLimitMph: %d
-            - accelerometerX: %f
-            - accelerometerY: %f
-            - accelerometerZ: %f
+    // Virtual thread executor for parallel execution (Java 21+)
+    private final ExecutorService parallelExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
-            Return the complete ImpactAnalysis result.
-            """.formatted(
-                event.gForce(),
-                event.speedMph(),
-                event.speedLimitMph(),
-                event.accelerometerX(),
-                event.accelerometerY(),
-                event.accelerometerZ()
-            ),
-            ImpactAnalysis.class
-        );
+    public CrashAgent(AccidentStatusService statusService) {
+        this.statusService = statusService;
     }
 
     /**
-     * Action 2: Gather environmental context using the Environment MCP server.
-     * Can run in parallel with Policy lookup (no dependency).
+     * Generate a claim reference number from the policy ID.
      */
-    @Action(
-        description = "Gather weather, location, and road conditions at accident site",
-        toolGroups = {"environment-tools"}
-    )
-    public EnvironmentContext gatherEnvironment(AccidentEvent event, Ai ai) {
-        log.info("Gathering environment for accident: lat={}, lon={}", event.latitude(), event.longitude());
-        return ai.withAutoLlm().createObject(
-            """
-            Use the Environment Agent tools to gather context for this accident.
-
-            Call get_full_environment_context with:
-            - latitude: %f
-            - longitude: %f
-            - timestamp: "%s"
-
-            Return the complete EnvironmentContext result.
-            """.formatted(
-                event.latitude(),
-                event.longitude(),
-                event.eventTime().toString()
-            ),
-            EnvironmentContext.class
-        );
+    private String generateClaimReference(long policyId) {
+        return "CLM-" + Year.now().getValue() + "-" + policyId;
     }
 
     /**
-     * Action 3: Look up policy information using the Policy MCP server.
-     * Can run in parallel with Environment gathering (no dependency).
+     * Format phone number for display, returning default text if unavailable.
      */
-    @Action(
-        description = "Retrieve policy, driver, and vehicle information",
-        toolGroups = {"policy-tools"}
-    )
-    public PolicyInfo lookupPolicy(AccidentEvent event, Ai ai) {
-        log.info("Looking up policy: policyId={}, driverId={}", event.policyId(), event.driverId());
-        return ai.withAutoLlm().createObject(
-            """
-            Use the Policy Agent tools to look up insurance information.
-
-            Call get_full_policy_info with:
-            - policyId: %d
-            - driverId: %d
-            - vehicleId: %d
-            - vin: "%s"
-
-            Return the complete PolicyInfo result.
-            """.formatted(
-                event.policyId(),
-                event.driverId(),
-                event.vehicleId(),
-                event.vin()
-            ),
-            PolicyInfo.class
-        );
+    private String formatPhone(String phone) {
+        return (phone != null && !phone.isBlank()) ? phone : "Call for info";
     }
 
     /**
-     * Action 4: Find nearby services using the Services MCP server.
-     * Depends on ImpactAnalysis for severity-based recommendations.
+     * PARALLEL Action: Gather all initial data (Impact, Environment, Policy) concurrently.
+     * This single action replaces the three sequential Level 0 actions with parallel execution.
+     * Uses Java 21 virtual threads to run all three MCP calls simultaneously.
      */
     @Action(
-        description = "Find nearby body shops, tow services, and hospitals based on severity",
-        toolGroups = {"services-tools"}
+        description = "Gather impact analysis, environment context, and policy info in parallel",
+        toolGroups = {"impact-analyst-tools", "environment-tools", "policy-tools"}
     )
-    public NearbyServices findServices(AccidentEvent event, ImpactAnalysis impact, Ai ai) {
-        log.info("Finding services for accident: severity={}, location=({}, {})",
-                impact.severity(), event.latitude(), event.longitude());
-        return ai.withAutoLlm().createObject(
-            """
-            Use the Services Agent tools to find nearby services.
+    public InitialData gatherInitialData(AccidentEvent event, Ai ai) {
+        log.info(">>> PARALLEL EXECUTION: Starting 3 concurrent actions for policyId={}", event.policyId());
+        long startTime = System.currentTimeMillis();
 
-            Call get_all_nearby_services with:
-            - latitude: %f
-            - longitude: %f
-            - severity: "%s"
-            - radiusMiles: 5.0
+        // Launch all three actions in parallel using CompletableFuture
+        CompletableFuture<ImpactAnalysis> impactFuture = CompletableFuture.supplyAsync(() -> {
+            log.info("[PARALLEL] Starting analyzeImpact");
+            statusService.broadcastAgentStatus("impact-analyst", "analyzeImpact", "STARTED");
+            try {
+                ImpactAnalysis result = ai.withAutoLlm().createObject(
+                    """
+                    Use the Impact Analyst tools to analyze this accident.
 
-            Return the complete NearbyServices result.
-            """.formatted(
-                event.latitude(),
-                event.longitude(),
-                impact.severity().name()
-            ),
-            NearbyServices.class
-        );
+                    Call the analyze_impact tool with:
+                    - gForce: %f
+                    - speedMph: %f
+                    - speedLimitMph: %d
+                    - accelerometerX: %f
+                    - accelerometerY: %f
+                    - accelerometerZ: %f
+
+                    Return the complete ImpactAnalysis result.
+                    """.formatted(
+                        event.gForce(),
+                        event.speedMph(),
+                        event.speedLimitMph(),
+                        event.accelerometerX(),
+                        event.accelerometerY(),
+                        event.accelerometerZ()
+                    ),
+                    ImpactAnalysis.class
+                );
+                statusService.broadcastAgentStatus("impact-analyst", "analyzeImpact", "COMPLETED");
+                log.info("[PARALLEL] Completed analyzeImpact: severity={}", result.severity());
+                return result;
+            } catch (Exception e) {
+                statusService.broadcastAgentStatus("impact-analyst", "analyzeImpact", "FAILED");
+                throw new RuntimeException("Impact analysis failed", e);
+            }
+        }, parallelExecutor);
+
+        CompletableFuture<EnvironmentContext> envFuture = CompletableFuture.supplyAsync(() -> {
+            log.info("[PARALLEL] Starting gatherEnvironment");
+            statusService.broadcastAgentStatus("environment", "gatherEnvironment", "STARTED");
+            try {
+                EnvironmentContext result = ai.withAutoLlm().createObject(
+                    """
+                    Use the Environment Agent tools to gather context for this accident.
+
+                    Call get_full_environment_context with:
+                    - latitude: %f
+                    - longitude: %f
+                    - timestamp: "%s"
+
+                    Return the complete EnvironmentContext result.
+                    """.formatted(
+                        event.latitude(),
+                        event.longitude(),
+                        event.eventTime().toString()
+                    ),
+                    EnvironmentContext.class
+                );
+                statusService.broadcastAgentStatus("environment", "gatherEnvironment", "COMPLETED");
+                log.info("[PARALLEL] Completed gatherEnvironment: address={}", result.address());
+                return result;
+            } catch (Exception e) {
+                statusService.broadcastAgentStatus("environment", "gatherEnvironment", "FAILED");
+                throw new RuntimeException("Environment gathering failed", e);
+            }
+        }, parallelExecutor);
+
+        CompletableFuture<PolicyInfo> policyFuture = CompletableFuture.supplyAsync(() -> {
+            log.info("[PARALLEL] Starting lookupPolicy");
+            statusService.broadcastAgentStatus("policy", "lookupPolicy", "STARTED");
+            try {
+                PolicyInfo result = ai.withAutoLlm().createObject(
+                    """
+                    Use the Policy Agent tools to look up insurance information.
+
+                    Call get_full_policy_info with:
+                    - policyId: %d
+                    - driverId: %d
+                    - vehicleId: %d
+                    - vin: "%s"
+
+                    Return the complete PolicyInfo result.
+                    """.formatted(
+                        event.policyId(),
+                        event.driverId(),
+                        event.vehicleId(),
+                        event.vin()
+                    ),
+                    PolicyInfo.class
+                );
+                statusService.broadcastAgentStatus("policy", "lookupPolicy", "COMPLETED");
+
+                // Broadcast customer detected event for UI sidebar
+                String claimReference = generateClaimReference(event.policyId());
+                statusService.broadcastCustomerDetected(
+                    claimReference,
+                    event.policyId(),
+                    result.driver().name(),
+                    result.driver().phone(),
+                    result.driver().email()
+                );
+                log.info("[PARALLEL] Completed lookupPolicy: driver={}", result.driver().name());
+                return result;
+            } catch (Exception e) {
+                statusService.broadcastAgentStatus("policy", "lookupPolicy", "FAILED");
+                throw new RuntimeException("Policy lookup failed", e);
+            }
+        }, parallelExecutor);
+
+        // Wait for all three to complete
+        try {
+            CompletableFuture.allOf(impactFuture, envFuture, policyFuture).join();
+
+            ImpactAnalysis impact = impactFuture.get();
+            EnvironmentContext environment = envFuture.get();
+            PolicyInfo policy = policyFuture.get();
+
+            long duration = System.currentTimeMillis() - startTime;
+            log.info("<<< PARALLEL EXECUTION COMPLETE: 3 actions finished in {} ms", duration);
+
+            return new InitialData(impact, environment, policy);
+        } catch (Exception e) {
+            log.error("Parallel execution failed: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to gather initial data in parallel", e);
+        }
     }
 
     /**
-     * Action 5: Initiate communications using the Communications MCP server.
-     * Depends on PolicyInfo for driver contact information and ImpactAnalysis for severity.
+     * PARALLEL Action: Find services AND initiate communications concurrently.
+     * Both depend only on InitialData, so they can run in parallel.
+     * Uses Java 21 virtual threads to run both MCP calls simultaneously.
      */
     @Action(
-        description = "Send driver wellness check and notify adjuster if needed",
-        toolGroups = {"communications-tools"}
+        description = "Find nearby services and initiate communications in parallel",
+        toolGroups = {"services-tools", "communications-tools"}
     )
-    public CommunicationsStatus initiateComms(
-            AccidentEvent event,
-            PolicyInfo policy,
-            ImpactAnalysis impact,
-            Ai ai
-    ) {
-        String claimReference = "CLM-" + java.time.Year.now().getValue() + "-" + event.policyId();
-        log.info("Initiating communications: claimRef={}, driver={}, severity={}",
-                claimReference, policy.driver().name(), impact.severity());
+    public SecondaryData gatherSecondaryData(AccidentEvent event, InitialData initialData, Ai ai) {
+        log.info(">>> PARALLEL EXECUTION: Starting 2 concurrent Level-1 actions for policyId={}", event.policyId());
+        long startTime = System.currentTimeMillis();
 
-        return ai.withAutoLlm().createObject(
-            """
-            Use the Communications Agent tools to initiate driver outreach.
+        // Launch findServices in parallel
+        CompletableFuture<NearbyServices> servicesFuture = CompletableFuture.supplyAsync(() -> {
+            log.info("[PARALLEL-L1] Starting findServices");
+            statusService.broadcastAgentStatus("services", "findServices", "STARTED");
+            try {
+                NearbyServices result = ai.withAutoLlm().createObject(
+                    """
+                    Use the Services Agent tools to find nearby services.
 
-            Call get_full_communications_status with:
-            - claimReference: "%s"
-            - driverName: "%s"
-            - driverPhone: "%s"
-            - severity: "%s"
+                    Call get_all_nearby_services with:
+                    - latitude: %f
+                    - longitude: %f
+                    - severity: "%s"
+                    - radiusMiles: 5.0
 
-            Return the complete CommunicationsStatus result.
-            """.formatted(
-                claimReference,
-                policy.driver().name(),
-                policy.driver().phone(),
-                impact.severity().name()
-            ),
-            CommunicationsStatus.class
-        );
+                    Return the complete NearbyServices result.
+                    """.formatted(
+                        event.latitude(),
+                        event.longitude(),
+                        initialData.impact().severity().name()
+                    ),
+                    NearbyServices.class
+                );
+                statusService.broadcastAgentStatus("services", "findServices", "COMPLETED");
+                log.info("[PARALLEL-L1] Completed findServices: drivable={}", result.vehicleLikelyDrivable());
+                return result;
+            } catch (Exception e) {
+                statusService.broadcastAgentStatus("services", "findServices", "FAILED");
+                throw new RuntimeException("Find services failed", e);
+            }
+        }, parallelExecutor);
+
+        // Launch initiateComms in parallel
+        CompletableFuture<CommunicationsStatus> commsFuture = CompletableFuture.supplyAsync(() -> {
+            String claimReference = generateClaimReference(event.policyId());
+            log.info("[PARALLEL-L1] Starting initiateComms for claim={}", claimReference);
+            statusService.broadcastAgentStatus("communications", "initiateComms", "STARTED");
+            try {
+                CommunicationsStatus result = ai.withAutoLlm().createObject(
+                    """
+                    Use the Communications Agent tools to initiate driver outreach.
+
+                    Call get_full_communications_status with:
+                    - claimReference: "%s"
+                    - driverName: "%s"
+                    - driverPhone: "%s"
+                    - severity: "%s"
+
+                    Return the complete CommunicationsStatus result.
+                    """.formatted(
+                        claimReference,
+                        initialData.policy().driver().name(),
+                        initialData.policy().driver().phone(),
+                        initialData.impact().severity().name()
+                    ),
+                    CommunicationsStatus.class
+                );
+                statusService.broadcastAgentStatus("communications", "initiateComms", "COMPLETED");
+                log.info("[PARALLEL-L1] Completed initiateComms: smsSent={}", result.driverOutreach().smsSent());
+                return result;
+            } catch (Exception e) {
+                statusService.broadcastAgentStatus("communications", "initiateComms", "FAILED");
+                throw new RuntimeException("Initiate communications failed", e);
+            }
+        }, parallelExecutor);
+
+        // Wait for both to complete
+        try {
+            CompletableFuture.allOf(servicesFuture, commsFuture).join();
+
+            NearbyServices services = servicesFuture.get();
+            CommunicationsStatus communications = commsFuture.get();
+
+            long duration = System.currentTimeMillis() - startTime;
+            log.info("<<< PARALLEL EXECUTION COMPLETE: 2 Level-1 actions finished in {} ms", duration);
+
+            return new SecondaryData(services, communications);
+        } catch (Exception e) {
+            log.error("Parallel Level-1 execution failed: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to gather secondary data in parallel", e);
+        }
     }
 
     /**
-     * Action 6: Compile the FNOL report (not final - email follows).
+     * Action 3: Compile the FNOL report (not final - email follows).
+     * Takes InitialData + SecondaryData (services and communications).
      */
     @Action(description = "Compile all agent results into FNOL report")
     public FNOLReport compileReport(
             AccidentEvent event,
-            ImpactAnalysis impact,
-            EnvironmentContext environment,
-            PolicyInfo policy,
-            NearbyServices services,
-            CommunicationsStatus communications
+            InitialData initialData,
+            SecondaryData secondaryData
     ) {
+        NearbyServices services = secondaryData.services();
+        CommunicationsStatus communications = secondaryData.communications();
+        ImpactAnalysis impact = initialData.impact();
+        EnvironmentContext environment = initialData.environment();
+        PolicyInfo policy = initialData.policy();
+
         log.info("Compiling FNOL report for policyId={}, severity={}",
                 event.policyId(), impact.severity());
+        statusService.broadcastAgentStatus("orchestrator", "compileReport", "STARTED");
 
         // Build recommended actions based on severity
         List<String> recommendedActions = new ArrayList<>();
@@ -253,10 +357,10 @@ public class CrashAgent {
             alerts.add("Awaiting driver response to wellness check");
         }
 
-        String claimNumber = "CLM-" + java.time.Year.now().getValue() + "-" +
-                            String.format("%06d", (int)(Math.random() * 999999));
+        String claimNumber = generateClaimReference(event.policyId());
 
         log.info("FNOL report compiled: claimNumber={}, alerts={}", claimNumber, alerts.size());
+        statusService.broadcastAgentStatus("orchestrator", "compileReport", "COMPLETED");
 
         return new FNOLReport(
             claimNumber,
@@ -288,6 +392,7 @@ public class CrashAgent {
     ) {
         log.info("Sending FNOL email for claim: {}, severity: {}",
                 report.claimNumber(), report.impact().severity());
+        statusService.broadcastAgentStatus("communications", "sendFnolToAdjuster", "STARTED");
 
         // Build the report content for the email
         String reportContent = buildEmailReportContent(report);
@@ -343,6 +448,7 @@ public class CrashAgent {
                 Use these parameters:
                 - claimReference: "%s"
                 - customerName: "%s"
+                - customerEmail: "%s"
                 - policyNumber: "%s"
                 - severity: "%s"
                 - adjusterInfo: "%s"
@@ -357,6 +463,7 @@ public class CrashAgent {
                 """.formatted(
                     report.claimNumber(),
                     report.policy().driver().name(),
+                    report.policy().driver().email(),
                     report.policy().policy().policyNumber(),
                     report.impact().severity().name(),
                     adjusterInfo.replace("\"", "\\\"").replace("\n", "\\n"),
@@ -372,6 +479,8 @@ public class CrashAgent {
         } catch (Exception e) {
             log.error("Failed to send customer follow-up email for claim {}: {}", report.claimNumber(), e.getMessage(), e);
         }
+
+        statusService.broadcastAgentStatus("communications", "sendFnolToAdjuster", "COMPLETED");
 
         // Return the original report
         return report;
@@ -389,13 +498,7 @@ public class CrashAgent {
             } else {
                 sb.append(" (").append(String.format("%.1f", svc.distanceMiles())).append(" mi)");
             }
-            // Always show phone line
-            sb.append("\n  Phone: ");
-            if (svc.phone() != null && !svc.phone().isBlank()) {
-                sb.append(svc.phone());
-            } else {
-                sb.append("Call for info");
-            }
+            sb.append("\n  Phone: ").append(formatPhone(svc.phone()));
             if (svc.address() != null && !svc.address().isBlank()) {
                 sb.append("\n  Address: ").append(svc.address());
             }
@@ -530,7 +633,7 @@ public class CrashAgent {
             for (var shop : report.services().bodyShops()) {
                 sb.append("  - ").append(shop.name());
                 sb.append(" (").append(String.format("%.1f", shop.distanceMiles())).append(" mi)");
-                sb.append(" - ").append(shop.phone() != null && !shop.phone().isBlank() ? shop.phone() : "Call for info");
+                sb.append(" - ").append(formatPhone(shop.phone()));
                 if (shop.isPreferred()) {
                     sb.append(" [PREFERRED]");
                 }
@@ -546,7 +649,7 @@ public class CrashAgent {
                 if (tow.etaMinutes() != null) {
                     sb.append(" (ETA: ").append(tow.etaMinutes()).append(" min)");
                 }
-                sb.append(" - ").append(tow.phone() != null && !tow.phone().isBlank() ? tow.phone() : "Call for info");
+                sb.append(" - ").append(formatPhone(tow.phone()));
                 if (tow.isPreferred()) {
                     sb.append(" [PREFERRED]");
                 }
@@ -560,7 +663,7 @@ public class CrashAgent {
             for (var med : report.services().medicalFacilities()) {
                 sb.append("  - ").append(med.name());
                 sb.append(" (").append(String.format("%.1f", med.distanceMiles())).append(" mi)");
-                sb.append(" - ").append(med.phone() != null && !med.phone().isBlank() ? med.phone() : "Call for info");
+                sb.append(" - ").append(formatPhone(med.phone()));
                 sb.append("\n");
             }
             sb.append("\n");
@@ -571,7 +674,7 @@ public class CrashAgent {
             for (var rental : report.services().rentalCarLocations()) {
                 sb.append("  - ").append(rental.name());
                 sb.append(" (").append(String.format("%.1f", rental.distanceMiles())).append(" mi)");
-                sb.append(" - ").append(rental.phone() != null && !rental.phone().isBlank() ? rental.phone() : "Call for info");
+                sb.append(" - ").append(formatPhone(rental.phone()));
                 if (rental.isPreferred()) {
                     sb.append(" [PREFERRED]");
                 }

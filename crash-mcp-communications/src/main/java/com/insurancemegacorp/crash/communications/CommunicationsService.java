@@ -1,14 +1,16 @@
 package com.insurancemegacorp.crash.communications;
 
+import com.insurancemegacorp.crash.communications.model.Message;
+import com.insurancemegacorp.crash.communications.repository.MessageRepository;
 import com.insurancemegacorp.crash.domain.CommunicationsStatus;
 import com.insurancemegacorp.crash.domain.CommunicationsStatus.CommunicationLog;
 import com.insurancemegacorp.crash.domain.CommunicationsStatus.DriverOutreach;
-import com.twilio.rest.api.v2010.account.Message;
 import com.twilio.type.PhoneNumber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springaicommunity.mcp.annotation.McpTool;
 import org.springaicommunity.mcp.annotation.McpToolParam;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -36,14 +38,23 @@ public class CommunicationsService {
     private final TwilioConfig twilioConfig;
     private final EmailConfig emailConfig;
     private final JavaMailSender mailSender;
+    private final MessageRepository messageRepository;
+
+    @Value("${demo.mode:false}")
+    private boolean demoMode;
 
     // Track communication history per claim
     private final ConcurrentMap<String, List<CommunicationLog>> communicationLogs = new ConcurrentHashMap<>();
 
-    public CommunicationsService(TwilioConfig twilioConfig, EmailConfig emailConfig, JavaMailSender mailSender) {
+    public CommunicationsService(
+            TwilioConfig twilioConfig,
+            EmailConfig emailConfig,
+            JavaMailSender mailSender,
+            MessageRepository messageRepository) {
         this.twilioConfig = twilioConfig;
         this.emailConfig = emailConfig;
         this.mailSender = mailSender;
+        this.messageRepository = messageRepository;
     }
 
     /**
@@ -60,14 +71,38 @@ public class CommunicationsService {
             String message,
 
             @McpToolParam(description = "Claim reference for tracking")
-            String claimReference
+            String claimReference,
+            
+            @McpToolParam(description = "Customer name (optional, for demo mode)", required = false)
+            String customerName
     ) {
         Instant sentAt = Instant.now();
         boolean delivered;
         String messageId;
         String status;
 
-        if (twilioConfig.isEnabled()) {
+        // Demo mode: save to database instead of sending
+        if (demoMode) {
+            log.info("DEMO MODE: Storing SMS to {} in database instead of sending", phoneNumber);
+            
+            Message dbMessage = Message.builder()
+                    .messageType("SMS")
+                    .recipientType("CUSTOMER")
+                    .recipientIdentifier(phoneNumber)
+                    .claimReference(claimReference)
+                    .subject(null)
+                    .body(message)
+                    .sentAt(sentAt)
+                    .customerName(customerName)
+                    .build();
+            
+            messageRepository.save(dbMessage);
+            
+            messageId = "DEMO-SMS-" + System.currentTimeMillis();
+            status = "STORED_IN_DB";
+            delivered = true;
+        }
+        else if (twilioConfig.isEnabled()) {
             // Send real SMS via Twilio
             // Use test number override if configured (for testing with fake customer numbers)
             String effectiveToNumber = twilioConfig.hasTestToNumber()
@@ -79,7 +114,8 @@ public class CommunicationsService {
             }
 
             try {
-                Message twilioMessage = Message.creator(
+                com.twilio.rest.api.v2010.account.Message twilioMessage =
+                        com.twilio.rest.api.v2010.account.Message.creator(
                     new PhoneNumber(effectiveToNumber),
                     new PhoneNumber(twilioConfig.getFromNumber()),
                     message
@@ -187,12 +223,29 @@ public class CommunicationsService {
 
         // Send email to adjuster if configured
         boolean emailSent = false;
-        if (emailConfig.isEnabled()) {
+        String subject = String.format("[%s PRIORITY] FNOL Report - %s", priority, claimNumber);
+        String htmlBody = buildAdjusterNotificationHtml(claimNumber, severity, priority,
+                                                         assignedAdjuster, summary, notifiedAt);
+        
+        // Demo mode: save to database instead of sending
+        if (demoMode) {
+            log.info("DEMO MODE: Storing adjuster notification for {} in database instead of sending", claimNumber);
+            
+            Message dbMessage = Message.builder()
+                    .messageType("EMAIL")
+                    .recipientType("ADJUSTER")
+                    .recipientIdentifier(emailConfig.getAdjusterEmail())
+                    .claimReference(claimNumber)
+                    .subject(subject)
+                    .body(htmlBody)
+                    .sentAt(notifiedAt)
+                    .build();
+            
+            messageRepository.save(dbMessage);
+            emailSent = true;
+        }
+        else if (emailConfig.isEnabled()) {
             try {
-                String subject = String.format("[%s PRIORITY] FNOL Report - %s", priority, claimNumber);
-                String htmlBody = buildAdjusterNotificationHtml(claimNumber, severity, priority,
-                                                                 assignedAdjuster, summary, notifiedAt);
-
                 MimeMessage message = mailSender.createMimeMessage();
                 MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
                 helper.setFrom(emailConfig.getUsername());
@@ -348,7 +401,28 @@ public class CommunicationsService {
 
         String htmlBody = buildFnolEmailHtml(claimReference, driverName, policyNumber, severity, reportContent, sentAt);
 
-        if (emailConfig.isEnabled()) {
+        // Demo mode: save to database instead of sending
+        if (demoMode) {
+            log.info("DEMO MODE: Storing FNOL email for {} in database instead of sending", claimReference);
+            
+            Message dbMessage = Message.builder()
+                    .messageType("EMAIL")
+                    .recipientType("ADJUSTER")
+                    .recipientIdentifier(emailConfig.getAdjusterEmail())
+                    .claimReference(claimReference)
+                    .subject(subject)
+                    .body(htmlBody)
+                    .sentAt(sentAt)
+                    .customerName(driverName)
+                    .build();
+            
+            messageRepository.save(dbMessage);
+            
+            messageId = "DEMO-EMAIL-" + System.currentTimeMillis();
+            status = "STORED_IN_DB";
+            sent = true;
+        }
+        else if (emailConfig.isEnabled()) {
             try {
                 MimeMessage message = mailSender.createMimeMessage();
                 MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -461,6 +535,9 @@ public class CommunicationsService {
 
             @McpToolParam(description = "Customer's full name")
             String customerName,
+            
+            @McpToolParam(description = "Customer's email address")
+            String customerEmail,
 
             @McpToolParam(description = "Policy number")
             String policyNumber,
@@ -496,10 +573,33 @@ public class CommunicationsService {
         String htmlBody = buildCustomerFollowupEmailHtml(claimReference, customerName, policyNumber, severity,
                 adjusterInfo, bodyShopsInfo, towServicesInfo, rentalCarsInfo, medicalInfo, nextSteps, sentAt);
 
-        // Determine recipient - use demo customer email if configured, otherwise simulate
-        String recipientEmail = emailConfig.hasCustomerEmail() ? emailConfig.getCustomerEmail() : null;
+        // Use the customer's email from policy data for demo mode, or configured email for production
+        String recipientEmail = demoMode ? customerEmail : 
+                               (emailConfig.hasCustomerEmail() ? emailConfig.getCustomerEmail() : customerEmail);
 
-        if (emailConfig.isEnabled() && recipientEmail != null) {
+        // Demo mode: save to database instead of sending
+        if (demoMode) {
+            log.info("DEMO MODE: Storing customer follow-up email for {} ({}) in database instead of sending", 
+                    customerName, recipientEmail);
+            
+            Message dbMessage = Message.builder()
+                    .messageType("EMAIL")
+                    .recipientType("CUSTOMER")
+                    .recipientIdentifier(recipientEmail)
+                    .claimReference(claimReference)
+                    .subject(subject)
+                    .body(htmlBody)
+                    .sentAt(sentAt)
+                    .customerName(customerName)
+                    .build();
+            
+            messageRepository.save(dbMessage);
+            
+            messageId = "DEMO-CUST-EMAIL-" + System.currentTimeMillis();
+            status = "STORED_IN_DB";
+            sent = true;
+        }
+        else if (emailConfig.isEnabled() && recipientEmail != null) {
             try {
                 MimeMessage message = mailSender.createMimeMessage();
                 MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -581,7 +681,7 @@ public class CommunicationsService {
             <html>
             <head>
                 <style>
-                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
                     .header { background: #1a237e; color: white; padding: 20px; text-align: center; }
                     .header h1 { margin: 0; font-size: 24px; }
                     .content { padding: 20px; }
@@ -714,7 +814,7 @@ public class CommunicationsService {
         );
         
         // Send wellness check
-        SmsResult smsResult = sendSms(driverPhone, smsContent, claimReference);
+        SmsResult smsResult = sendSms(driverPhone, smsContent, claimReference, driverName);
         
         // Send push notification
         PushResult pushResult = sendPushNotification(

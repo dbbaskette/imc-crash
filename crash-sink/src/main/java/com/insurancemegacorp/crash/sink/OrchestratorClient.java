@@ -45,15 +45,13 @@ public class OrchestratorClient {
                 FNOLReport.class
             );
 
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                FNOLReport report = response.getBody();
-                log.info("Orchestrator processed accident successfully: claimNumber={}",
-                        report.claimNumber());
+            FNOLReport report = response.getBody();
+            if (response.getStatusCode().is2xxSuccessful() && report != null) {
+                log.info("Orchestrator processed accident successfully: claimNumber={}", report.claimNumber());
                 return report;
-            } else {
-                log.error("Orchestrator returned non-success status: {}", response.getStatusCode());
-                return null;
             }
+            log.error("Orchestrator returned non-success status: {}", response.getStatusCode());
+            return null;
         } catch (Exception e) {
             log.error("Failed to forward accident to orchestrator: {}", e.getMessage(), e);
             return null;

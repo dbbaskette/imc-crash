@@ -66,21 +66,12 @@ public class TelemetrySink {
                 }
 
                 // Log accident detection
-                log.info("========================================");
-                log.info("ACCIDENT DETECTED - Forwarding to Orchestrator");
-                log.info("========================================");
-                log.info("Policy ID:    {}", telemetry.policyId());
-                log.info("Vehicle ID:   {}", telemetry.vehicleId());
-                log.info("Driver ID:    {}", telemetry.driverId());
-                log.info("VIN:          {}", telemetry.vin());
-                log.info("----------------------------------------");
-                log.info("Severity:     {}", telemetry.severity());
-                log.info("G-Force:      {}", telemetry.gForce());
-                log.info("Speed:        {} mph (limit: {})", telemetry.speedMph(), telemetry.speedLimitMph());
-                log.info("----------------------------------------");
-                log.info("Location:     {}", telemetry.currentStreet());
-                log.info("Coordinates:  {}, {}", telemetry.gpsLatitude(), telemetry.gpsLongitude());
-                log.info("========================================");
+                log.info("ACCIDENT DETECTED - policyId={}, vehicleId={}, driverId={}, vin={}",
+                        telemetry.policyId(), telemetry.vehicleId(), telemetry.driverId(), telemetry.vin());
+                log.info("Impact: severity={}, gForce={}, speed={} mph (limit: {})",
+                        telemetry.severity(), telemetry.gForce(), telemetry.speedMph(), telemetry.speedLimitMph());
+                log.info("Location: {} ({}, {})",
+                        telemetry.currentStreet(), telemetry.gpsLatitude(), telemetry.gpsLongitude());
 
                 // Map to AccidentEvent and forward to orchestrator
                 AccidentEvent event = telemetryMapper.toAccidentEvent(telemetry);

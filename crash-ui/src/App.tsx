@@ -18,11 +18,10 @@ function App() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [connected, setConnected] = useState(false);
 
-  // Save tab state when it changes
-  const handleTabChange = (tab: Tab) => {
+  function handleTabChange(tab: Tab) {
     setActiveTab(tab);
     localStorage.setItem('crash-ui-tab', tab);
-  };
+  }
 
   useEffect(() => {
     websocketService.connect(

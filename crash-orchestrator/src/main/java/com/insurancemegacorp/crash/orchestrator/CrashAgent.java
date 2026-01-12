@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.time.Year;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -38,6 +39,20 @@ public class CrashAgent {
 
     public CrashAgent(AccidentStatusService statusService) {
         this.statusService = statusService;
+    }
+
+    /**
+     * Generate a claim reference number from the policy ID.
+     */
+    private String generateClaimReference(long policyId) {
+        return "CLM-" + Year.now().getValue() + "-" + policyId;
+    }
+
+    /**
+     * Format phone number for display, returning default text if unavailable.
+     */
+    private String formatPhone(String phone) {
+        return (phone != null && !phone.isBlank()) ? phone : "Call for info";
     }
 
     /**
@@ -146,7 +161,7 @@ public class CrashAgent {
                 statusService.broadcastAgentStatus("policy", "lookupPolicy", "COMPLETED");
 
                 // Broadcast customer detected event for UI sidebar
-                String claimReference = "CLM-" + java.time.Year.now().getValue() + "-" + event.policyId();
+                String claimReference = generateClaimReference(event.policyId());
                 statusService.broadcastCustomerDetected(
                     claimReference,
                     event.policyId(),
@@ -227,7 +242,7 @@ public class CrashAgent {
 
         // Launch initiateComms in parallel
         CompletableFuture<CommunicationsStatus> commsFuture = CompletableFuture.supplyAsync(() -> {
-            String claimReference = "CLM-" + java.time.Year.now().getValue() + "-" + event.policyId();
+            String claimReference = generateClaimReference(event.policyId());
             log.info("[PARALLEL-L1] Starting initiateComms for claim={}", claimReference);
             statusService.broadcastAgentStatus("communications", "initiateComms", "STARTED");
             try {
@@ -342,7 +357,7 @@ public class CrashAgent {
             alerts.add("Awaiting driver response to wellness check");
         }
 
-        String claimNumber = "CLM-" + java.time.Year.now().getValue() + "-" + event.policyId();
+        String claimNumber = generateClaimReference(event.policyId());
 
         log.info("FNOL report compiled: claimNumber={}, alerts={}", claimNumber, alerts.size());
         statusService.broadcastAgentStatus("orchestrator", "compileReport", "COMPLETED");
@@ -483,13 +498,7 @@ public class CrashAgent {
             } else {
                 sb.append(" (").append(String.format("%.1f", svc.distanceMiles())).append(" mi)");
             }
-            // Always show phone line
-            sb.append("\n  Phone: ");
-            if (svc.phone() != null && !svc.phone().isBlank()) {
-                sb.append(svc.phone());
-            } else {
-                sb.append("Call for info");
-            }
+            sb.append("\n  Phone: ").append(formatPhone(svc.phone()));
             if (svc.address() != null && !svc.address().isBlank()) {
                 sb.append("\n  Address: ").append(svc.address());
             }
@@ -624,7 +633,7 @@ public class CrashAgent {
             for (var shop : report.services().bodyShops()) {
                 sb.append("  - ").append(shop.name());
                 sb.append(" (").append(String.format("%.1f", shop.distanceMiles())).append(" mi)");
-                sb.append(" - ").append(shop.phone() != null && !shop.phone().isBlank() ? shop.phone() : "Call for info");
+                sb.append(" - ").append(formatPhone(shop.phone()));
                 if (shop.isPreferred()) {
                     sb.append(" [PREFERRED]");
                 }
@@ -640,7 +649,7 @@ public class CrashAgent {
                 if (tow.etaMinutes() != null) {
                     sb.append(" (ETA: ").append(tow.etaMinutes()).append(" min)");
                 }
-                sb.append(" - ").append(tow.phone() != null && !tow.phone().isBlank() ? tow.phone() : "Call for info");
+                sb.append(" - ").append(formatPhone(tow.phone()));
                 if (tow.isPreferred()) {
                     sb.append(" [PREFERRED]");
                 }
@@ -654,7 +663,7 @@ public class CrashAgent {
             for (var med : report.services().medicalFacilities()) {
                 sb.append("  - ").append(med.name());
                 sb.append(" (").append(String.format("%.1f", med.distanceMiles())).append(" mi)");
-                sb.append(" - ").append(med.phone() != null && !med.phone().isBlank() ? med.phone() : "Call for info");
+                sb.append(" - ").append(formatPhone(med.phone()));
                 sb.append("\n");
             }
             sb.append("\n");
@@ -665,7 +674,7 @@ public class CrashAgent {
             for (var rental : report.services().rentalCarLocations()) {
                 sb.append("  - ").append(rental.name());
                 sb.append(" (").append(String.format("%.1f", rental.distanceMiles())).append(" mi)");
-                sb.append(" - ").append(rental.phone() != null && !rental.phone().isBlank() ? rental.phone() : "Call for info");
+                sb.append(" - ").append(formatPhone(rental.phone()));
                 if (rental.isPreferred()) {
                     sb.append(" [PREFERRED]");
                 }

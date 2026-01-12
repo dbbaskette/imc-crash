@@ -1,9 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AgentStatusMessage } from '../types';
 import './ArchitectureView.css';
 
+type ActionStatus = 'idle' | 'active' | 'completed';
+
 interface ActionState {
-  status: 'idle' | 'active' | 'completed';
+  status: ActionStatus;
+}
+
+function mapWebSocketStatusToActionStatus(wsStatus: string): ActionStatus {
+  switch (wsStatus) {
+    case 'STARTED':
+      return 'active';
+    case 'COMPLETED':
+      return 'completed';
+    default:
+      return 'idle';
+  }
 }
 
 interface ArchitectureViewProps {
@@ -65,7 +78,7 @@ const LEVELS = [
   { y: 450, label: 'Level 2 - Compile Report', width: 180 },
 ];
 
-export const ArchitectureView: React.FC<ArchitectureViewProps> = ({ agentStatus }) => {
+export function ArchitectureView({ agentStatus }: ArchitectureViewProps) {
   // Track status by action name (e.g., "analyzeImpact", "gatherEnvironment")
   const [actionStates, setActionStates] = useState<Record<string, ActionState>>({});
   const [goalAchieved, setGoalAchieved] = useState(false);
@@ -80,7 +93,7 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({ agentStatus 
       setActionStates((prev) => ({
         ...prev,
         [action]: {
-          status: status === 'STARTED' ? 'active' : status === 'COMPLETED' ? 'completed' : 'idle',
+          status: mapWebSocketStatusToActionStatus(status),
         },
       }));
 
@@ -103,23 +116,27 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({ agentStatus 
     }
   }, [agentStatus]);
 
-  const getActionStatus = (actionKey: string): 'idle' | 'active' | 'completed' => {
-    return actionStates[actionKey]?.status || 'idle';
-  };
+  function getActionStatus(actionKey: string): ActionStatus {
+    return actionStates[actionKey]?.status ?? 'idle';
+  }
 
-  const renderNode = (key: string, node: NodeDef, type: 'input' | 'action' | 'output' | 'goal') => {
+  function getNodeClassName(type: 'input' | 'action' | 'output' | 'goal', status: ActionStatus): string {
+    const base = 'goap-node';
+    switch (type) {
+      case 'input':
+        return `${base} input-node`;
+      case 'goal':
+        return goalAchieved ? `${base} goal-node achieved` : `${base} goal-node`;
+      default:
+        return `${base} action-node ${status}`;
+    }
+  }
+
+  function renderNode(key: string, node: NodeDef, type: 'input' | 'action' | 'output' | 'goal') {
     const status = getActionStatus(node.actionKey);
     const width = type === 'goal' ? 180 : 140;
     const height = type === 'input' && node.subtitle ? 50 : 40;
-
-    let className = 'goap-node';
-    if (type === 'input') {
-      className += ' input-node';
-    } else if (type === 'goal') {
-      className += goalAchieved ? ' goal-node achieved' : ' goal-node';
-    } else {
-      className += ` action-node ${status}`;
-    }
+    const className = getNodeClassName(type, status);
 
     return (
       <g key={key}>
@@ -141,9 +158,9 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({ agentStatus 
         )}
       </g>
     );
-  };
+  }
 
-  const renderConnection = (conn: { from: string; to: string }, index: number) => {
+  function renderConnection(conn: { from: string; to: string }, index: number) {
     const fromNode = NODES[conn.from];
     const toNode = NODES[conn.to];
     if (!fromNode || !toNode) return null;
@@ -160,9 +177,9 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({ agentStatus 
         markerEnd="url(#arrowhead)"
       />
     );
-  };
+  }
 
-  const renderLevelBackground = (level: { y: number; label: string; width: number }, index: number) => {
+  function renderLevelBackground(level: { y: number; label: string; width: number }, index: number) {
     const x = 400 - level.width / 2;
 
     return (
@@ -180,7 +197,7 @@ export const ArchitectureView: React.FC<ArchitectureViewProps> = ({ agentStatus 
         </text>
       </g>
     );
-  };
+  }
 
   return (
     <div className="architecture-view">

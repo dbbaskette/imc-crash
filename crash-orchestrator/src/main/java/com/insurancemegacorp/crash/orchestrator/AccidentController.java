@@ -34,21 +34,12 @@ public class AccidentController {
      */
     @PostMapping
     public ResponseEntity<FNOLReport> processAccident(@RequestBody AccidentEvent event) {
-        log.info("========================================");
-        log.info("ACCIDENT RECEIVED FROM SINK");
-        log.info("========================================");
-        log.info("Policy ID:    {}", event.policyId());
-        log.info("Vehicle ID:   {}", event.vehicleId());
-        log.info("Driver ID:    {}", event.driverId());
-        log.info("VIN:          {}", event.vin());
-        log.info("----------------------------------------");
-        log.info("G-Force:      {}", event.gForce());
-        log.info("Speed:        {} mph (limit: {})", event.speedMph(), event.speedLimitMph());
-        log.info("----------------------------------------");
-        log.info("Location:     {}", event.currentStreet());
-        log.info("Coordinates:  {}, {}", event.latitude(), event.longitude());
-        log.info("Time:         {}", event.eventTime());
-        log.info("========================================");
+        log.info("ACCIDENT RECEIVED - policyId={}, vehicleId={}, driverId={}, vin={}",
+                event.policyId(), event.vehicleId(), event.driverId(), event.vin());
+        log.info("Impact: gForce={}, speed={} mph (limit: {})",
+                event.gForce(), event.speedMph(), event.speedLimitMph());
+        log.info("Location: {} ({}, {}) at {}",
+                event.currentStreet(), event.latitude(), event.longitude(), event.eventTime());
 
         try {
             // Process through Embabel agents

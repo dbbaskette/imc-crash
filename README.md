@@ -30,11 +30,15 @@ flowchart TB
         RMQ["RabbitMQ<br/>telematics_exchange<br/>(fanout)"]
     end
 
-    subgraph Orchestration["Orchestrator"]
-        ORCH["IMC-CRASH ORCHESTRATOR<br/><br/>• Consumes crash events<br/>• GOAP planning for FNOL<br/>• Persists to PostgreSQL<br/>• Emails FNOL to adjusters"]
+    subgraph Sink["Crash Sink (Scalable)"]
+        SINK["CRASH-SINK<br/><br/>• Filters g-force ≥ 2.5<br/>• Forwards via HTTP"]
     end
 
-    TEL --> RMQ --> ORCH
+    subgraph Orchestration["Orchestrator"]
+        ORCH["IMC-CRASH ORCHESTRATOR<br/><br/>• GOAP planning for FNOL<br/>• Parallel execution (Level 0 + Level 1)<br/>• Persists to PostgreSQL<br/>• Emails FNOL to adjusters<br/>• WebSocket broadcasts"]
+    end
+
+    TEL --> RMQ --> SINK --> ORCH
 
     subgraph Hive["THE HIVE (Independent Specialist Agents)"]
         direction TB
@@ -50,6 +54,13 @@ flowchart TB
     ORCH <--> |"MCP/HTTP"| POL
     ORCH <--> |"MCP/HTTP"| SVC
     ORCH <--> |"MCP/HTTP"| COM
+
+    subgraph UI["Demo UI"]
+        WEB["CRASH-UI<br/><br/>• Architecture visualization<br/>• Agent/Customer portals<br/>• WebSocket status updates"]
+    end
+
+    ORCH -.-> |"WebSocket"| WEB
+    COM -.-> |"REST API"| WEB
 ```
 
 ## Key Technologies
@@ -69,12 +80,12 @@ flowchart TB
 
 ## How It Works
 
-1. **Event Trigger** — Safe driver app detects g-force > 2.5 and sends telemetry
-2. **Orchestrator Plans** — GOAP planner analyzes dependencies and creates execution plan
-3. **Parallel Execution** — Impact, Environment, and Policy agents run simultaneously
-4. **Dependent Execution** — Services and Communications wait for required data
+1. **Event Trigger** — Safe driver app detects g-force > 2.5 and sends telemetry to RabbitMQ
+2. **Sink Filters** — Lightweight crash-sink filters for accidents and forwards to orchestrator via HTTP
+3. **Level 0 Parallel** — Impact, Environment, and Policy agents run simultaneously (virtual threads)
+4. **Level 1 Parallel** — Services and Communications run simultaneously once Level 0 completes
 5. **Report Compilation** — All results aggregated into comprehensive FNOL report
-6. **Notifications** — SMS to driver, email to adjuster, report persisted to database
+6. **Notifications** — SMS to driver, email to adjuster + customer, report persisted to database
 
 ### GOAP Execution Flow
 
@@ -82,7 +93,7 @@ flowchart TB
 flowchart TB
     AE["AccidentEvent<br/>(from telemetry)"]
 
-    subgraph Level0["Level 0 - Parallel Execution"]
+    subgraph Level0["Level 0 - Parallel (Impact, Env, Policy)"]
         direction LR
         AI["analyzeImpact"]
         GE["gatherEnvironment"]
@@ -97,7 +108,7 @@ flowchart TB
     AI --> IC
     LP --> IC
 
-    subgraph Level1["Level 1 - Severity-Dependent"]
+    subgraph Level1["Level 1 - Parallel (Services, Comms)"]
         direction LR
         FS["findServices"]
         IC["initiateComms"]
@@ -106,15 +117,12 @@ flowchart TB
     GE --> CR
     FS --> CR
     IC --> CR
-    AI --> CR
-    LP --> CR
 
-    subgraph Level2["Level 2 - Goal Achievement"]
+    subgraph Level2["Level 2 - Compile Report"]
         CR["compileReport"]
     end
 
-    CR --> FNOL["FNOLReport"]
-    FNOL --> SEND["sendFnolToAdjuster"]
+    CR --> SEND["sendFnolToAdjuster"]
     SEND --> OUT["Email sent + DB persisted"]
 
     style OUT fill:#228B22,color:#fff
@@ -146,6 +154,16 @@ flowchart TB
 | **Orchestrator** | GOAP Planning | **REAL** | Embabel Agent Framework |
 | **Orchestrator** | LLM Reasoning | **REAL** | Google Gemini |
 
+## Demo UI
+
+The system includes a React-based demo UI accessible at `http://localhost:5173`:
+
+- **Architecture View** — Real-time visualization of GOAP execution with agents "lighting up" as they process
+- **Agent Portal** — Adjuster email inbox showing FNOL reports
+- **Customer Portal** — Customer message viewer (SMS + email)
+
+**Demo Mode**: Set `DEMO_MODE=true` to intercept emails/SMS and display them in the UI instead of sending externally.
+
 ## Deployment Options
 
 | Environment | Documentation | Status |
@@ -158,12 +176,14 @@ flowchart TB
 ```
 imc-crash/
 ├── crash-domain/                   # Shared domain objects (Java Records)
-├── crash-orchestrator/             # Central orchestrator + RabbitMQ sink
+├── crash-orchestrator/             # GOAP orchestrator + WebSocket
+├── crash-sink/                     # Lightweight RabbitMQ consumer (scalable)
 ├── crash-mcp-impact-analyst/       # Impact analysis agent
 ├── crash-mcp-environment/          # Environment context agent
 ├── crash-mcp-policy/               # Policy lookup agent
 ├── crash-mcp-services/             # Services finder agent
 ├── crash-mcp-communications/       # Communications agent
+├── crash-ui/                       # React demo UI (Architecture + Portals)
 ├── db/                             # Database schema and setup scripts
 ├── docker-compose.yml              # Container orchestration
 ├── vars.yaml.template              # Configuration template

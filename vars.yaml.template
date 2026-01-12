@@ -53,6 +53,12 @@ gmail:
   adjuster_email: ""     # Recipient email for FNOL reports (e.g., adjuster@company.com)
   customer_email: ""     # Customer email for followup (this is one address for all user emails for demo purposes)
 
+# Demo Mode (NEW!)
+# When enabled, emails and SMS are stored in database instead of being sent
+# This allows the UI to display them without needing real Gmail/Twilio accounts
+demo:
+  mode: true  # Set to false to send real emails/SMS via Gmail/Twilio
+
 # Service Ports (defaults shown - change if needed)
 ports:
   orchestrator: 8080

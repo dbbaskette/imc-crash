@@ -4,6 +4,23 @@ server:
 spring:
   application:
     name: crash-communications
+  
+  # Database configuration for demo mode message storage
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:crashdb}
+    username: ${DB_USER:crashuser}
+    password: ${DB_PASSWORD:crashpass}
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate  # Schema managed by init-schema.sql
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+  
   ai:
     mcp:
       server:
@@ -45,6 +62,11 @@ gmail:
   app-password: ${GMAIL_APP_PASSWORD:}
   adjuster-email: ${GMAIL_ADJUSTER_EMAIL:}
   customer-email: ${GMAIL_CUSTOMER_EMAIL:}  # For demo: all customer emails go to this address
+
+# Demo Mode Configuration
+# When enabled, emails and SMS are stored in database instead of being sent
+demo:
+  mode: ${DEMO_MODE:false}
 
 spring.mail:
   host: smtp.gmail.com

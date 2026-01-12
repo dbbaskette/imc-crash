@@ -1,0 +1,72 @@
+spring:
+  application:
+    name: crash-sink
+
+  # Spring Cloud Stream configuration
+  cloud:
+    function:
+      definition: processTelemetry
+    stream:
+      bindings:
+        # Input: Vehicle telemetry events from telematics exchange
+        processTelemetry-in-0:
+          destination: ${TELEMETRY_INPUT_DESTINATION:telematics_exchange}
+          group: ${TELEMETRY_INPUT_GROUP:crash-sink-group}
+          consumer:
+            concurrency: ${CONSUMER_CONCURRENCY:1}
+
+        # Output 0: vehicle_events queue (original format)
+        processTelemetry-out-0:
+          destination: ${VEHICLE_EVENTS_DESTINATION:vehicle_events}
+
+        # Output 1: fnol_reports queue (enriched reports)
+        processTelemetry-out-1:
+          destination: ${FNOL_REPORTS_DESTINATION:fnol_reports}
+
+      rabbit:
+        bindings:
+          processTelemetry-in-0:
+            consumer:
+              exchangeType: fanout
+              bindingRoutingKey: "#"
+
+          processTelemetry-out-0:
+            producer:
+              exchangeType: topic
+              routingKeyExpression: "headers.containsKey('severity') ? 'vehicle.accident.' + headers['severity'].toString().toLowerCase() : 'vehicle.accident.unknown'"
+
+          processTelemetry-out-1:
+            producer:
+              exchangeType: topic
+              routingKeyExpression: "headers.containsKey('severity') ? 'fnol.' + headers['severity'].toString().toLowerCase() : 'fnol.unknown'"
+
+  # RabbitMQ connection
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:guest}
+    password: ${SPRING_RABBITMQ_PASSWORD:guest}
+
+# Orchestrator URL for forwarding accidents
+orchestrator:
+  url: ${ORCHESTRATOR_URL:http://localhost:8080}
+
+# Server configuration
+server:
+  port: ${PORT:8086}
+
+# Actuator/Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# Logging
+logging:
+  level:
+    com.insurancemegacorp: ${LOG_LEVEL:INFO}
+    org.springframework.cloud.stream: INFO

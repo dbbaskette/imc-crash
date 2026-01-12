@@ -1,0 +1,159 @@
+.architecture-view {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.architecture-view h2 {
+  margin-bottom: 20px;
+  color: #333;
+  font-size: 20px;
+}
+
+.goap-diagram {
+  background: #1e1e2e;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Level backgrounds */
+.level-background {
+  fill: rgba(100, 100, 100, 0.3);
+  stroke: none;
+}
+
+.level-label {
+  fill: #aaa;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Connection lines */
+.connection-line {
+  fill: none;
+  stroke: #666;
+  stroke-width: 1.5;
+}
+
+/* Base node styles */
+.goap-node {
+  stroke-width: 2;
+  transition: all 0.3s ease;
+}
+
+/* Input node (AccidentEvent) */
+.goap-node.input-node {
+  fill: #4a4a5a;
+  stroke: #666;
+}
+
+/* Action nodes - idle state */
+.goap-node.action-node {
+  fill: #4a4a5a;
+  stroke: #666;
+}
+
+.goap-node.action-node.idle {
+  fill: #4a4a5a;
+  stroke: #666;
+}
+
+/* Action nodes - active state */
+.goap-node.action-node.active {
+  fill: #4a90a4;
+  stroke: #6ab0c4;
+  filter: drop-shadow(0 0 8px rgba(106, 176, 196, 0.5));
+  animation: pulse 1.5s infinite;
+}
+
+/* Action nodes - completed state */
+.goap-node.action-node.completed {
+  fill: #2a7a4a;
+  stroke: #4a9a6a;
+  filter: drop-shadow(0 0 6px rgba(74, 154, 106, 0.4));
+}
+
+/* Output node (FNOLReport) */
+.goap-node.output-node {
+  fill: #5a5a6a;
+  stroke: #7a7a8a;
+}
+
+/* Goal node (Email sent + DB persisted) - starts gray */
+.goap-node.goal-node {
+  fill: #4a4a5a;
+  stroke: #666;
+}
+
+/* Goal node - achieved state (green) */
+.goap-node.goal-node.achieved {
+  fill: #2a8a4a;
+  stroke: #4aaa6a;
+  filter: drop-shadow(0 0 10px rgba(42, 138, 74, 0.6));
+}
+
+/* Node text */
+.node-text {
+  fill: #fff;
+  font-size: 11px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  pointer-events: none;
+}
+
+.node-subtitle {
+  fill: #aaa;
+  font-size: 10px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  pointer-events: none;
+}
+
+/* Legend */
+.legend {
+  display: flex;
+  gap: 24px;
+  margin-top: 20px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #555;
+}
+
+.legend-color {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid #666;
+}
+
+.legend-color.idle {
+  background: #4a4a5a;
+}
+
+.legend-color.active {
+  background: #4a90a4;
+  border-color: #6ab0c4;
+}
+
+.legend-color.completed {
+  background: #2a7a4a;
+  border-color: #4a9a6a;
+}
+
+.legend-color.goal {
+  background: #2a8a4a;
+  border-color: #4aaa6a;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}

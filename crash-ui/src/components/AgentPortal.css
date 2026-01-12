@@ -1,0 +1,126 @@
+.agent-portal, .customer-portal {
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  height: calc(100vh - 120px);
+  gap: 20px;
+  padding: 20px;
+}
+
+.messages-list {
+  border-right: 1px solid #ddd;
+  overflow-y: auto;
+  padding-right: 20px;
+}
+
+.message-item {
+  padding: 15px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.message-item:hover {
+  background: #f5f5f5;
+}
+
+.message-item.selected {
+  background: #e3f2fd;
+  border-left: 3px solid #2196F3;
+}
+
+.message-subject {
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #333;
+}
+
+.message-meta {
+  font-size: 12px;
+  color: #666;
+}
+
+.message-detail {
+  overflow-y: auto;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+}
+
+.message-body {
+  margin-top: 20px;
+  line-height: 1.6;
+}
+
+.empty-state, .empty-detail {
+  color: #999;
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+.list-header h2 {
+  margin: 0;
+}
+
+.delete-btn {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.delete-btn:hover {
+  background: #c82333;
+}
+
+.customer-header {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.message-tabs {
+  display: flex;
+  gap: 10px;
+  margin: 15px 0;
+}
+
+.message-tab {
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.message-tab:hover {
+  background: #e0e0e0;
+}
+
+.message-tab.active {
+  background: #2196F3;
+  color: white;
+  border-color: #2196F3;
+}
+
+.message-title {
+  margin: 15px 0 10px 0;
+  color: #333;
+}

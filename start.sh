@@ -1,13 +1,21 @@
 #!/bin/bash
 
 # CRASH - Claims Response Agent System Hive
-# Startup Script (Docker Compose)
+# Startup Script (Docker Compose or Cloud Foundry)
+#
+# Usage:
+#   ./start.sh              - Start with Docker Compose
+#   ./start.sh --build      - Build and start with Docker Compose
+#   ./start.sh --reset-db   - Reset database and start
+#   ./start.sh --cf         - Deploy to Cloud Foundry
+#   ./start.sh --cf --build - Build and deploy to Cloud Foundry
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VARS_FILE="${SCRIPT_DIR}/vars.yaml"
 ENV_FILE="${SCRIPT_DIR}/.env"
+MANIFEST_FILE="${SCRIPT_DIR}/manifest.yml"
 
 # Colors
 RED='\033[0;31m'
@@ -15,6 +23,25 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
+
+# Parse arguments
+CF_DEPLOY=false
+DO_BUILD=false
+RESET_DB=false
+
+for arg in "$@"; do
+    case $arg in
+        --cf)
+            CF_DEPLOY=true
+            ;;
+        --build|-b)
+            DO_BUILD=true
+            ;;
+        --reset-db)
+            RESET_DB=true
+            ;;
+    esac
+done
 
 echo -e "${CYAN}"
 echo "   ____  ____      _     ____   _   _ "
@@ -195,15 +222,80 @@ else
 fi
 
 # Build if requested
-if [ "$1" == "--build" ] || [ "$1" == "-b" ]; then
+if [ "$DO_BUILD" = true ]; then
     echo
     echo -e "${YELLOW}Building all modules...${NC}"
     mvn clean package -DskipTests
+
+    # Build UI for CF deployment
+    if [ "$CF_DEPLOY" = true ]; then
+        echo -e "${YELLOW}Building React UI...${NC}"
+        cd crash-ui && npm ci && npm run build && cd ..
+    fi
+
     echo -e "${GREEN}✓ Build complete${NC}"
 fi
 
-# Check if --reset-db flag is passed or if database needs initialization
-if [ "$1" == "--reset-db" ] || [ "$2" == "--reset-db" ]; then
+# Cloud Foundry deployment
+if [ "$CF_DEPLOY" = true ]; then
+    echo
+    echo -e "${YELLOW}Deploying to Cloud Foundry...${NC}"
+    echo
+
+    # Check if cf CLI is available
+    if ! command -v cf &> /dev/null; then
+        echo -e "${RED}ERROR: cf CLI not found${NC}"
+        echo "Please install the Cloud Foundry CLI: https://docs.cloudfoundry.org/cf-cli/install-go-cli.html"
+        exit 1
+    fi
+
+    # Check if logged in
+    if ! cf target &> /dev/null; then
+        echo -e "${RED}ERROR: Not logged in to Cloud Foundry${NC}"
+        echo "Please run: cf login -a <api-endpoint>"
+        exit 1
+    fi
+
+    # Check if manifest exists
+    if [ ! -f "$MANIFEST_FILE" ]; then
+        echo -e "${RED}ERROR: manifest.yml not found${NC}"
+        exit 1
+    fi
+
+    # Check if JAR files exist (if not built)
+    if [ ! -f "crash-orchestrator/target/crash-orchestrator.jar" ]; then
+        echo -e "${RED}ERROR: JAR files not found. Run with --build flag first:${NC}"
+        echo "  ./start.sh --cf --build"
+        exit 1
+    fi
+
+    # Check if UI dist exists
+    if [ ! -d "crash-ui/dist" ]; then
+        echo -e "${RED}ERROR: UI build not found. Run with --build flag first:${NC}"
+        echo "  ./start.sh --cf --build"
+        exit 1
+    fi
+
+    # Deploy using manifest with vars file
+    echo -e "${CYAN}Running: cf push --vars-file vars.yaml${NC}"
+    cf push --vars-file "$VARS_FILE"
+
+    echo
+    echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║      CRASH Hive deployed to Cloud Foundry!                 ║${NC}"
+    echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
+    echo
+    echo "Check app status:  cf apps"
+    echo "View logs:         cf logs crash-orchestrator --recent"
+    echo "Scale sink:        cf scale crash-sink -i 3"
+    echo
+    exit 0
+fi
+
+# Docker Compose deployment (default)
+
+# Check if --reset-db flag is passed
+if [ "$RESET_DB" = true ]; then
     echo
     echo -e "${YELLOW}Resetting database (removing postgres_data volume)...${NC}"
     docker-compose down -v 2>/dev/null || true
@@ -224,11 +316,13 @@ echo -e "${GREEN}║         CRASH Hive is starting via Docker!                 
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo
 echo "Services will be available at:"
+echo "  • Demo UI:          http://localhost:5173"
 echo "  • Impact Analyst:   http://localhost:8081"
 echo "  • Environment:      http://localhost:8082"
 echo "  • Policy:           http://localhost:8083"
 echo "  • Services:         http://localhost:8084"
 echo "  • Communications:   http://localhost:8085"
+echo "  • Crash Sink:       http://localhost:8086"
 echo "  • Orchestrator:     http://localhost:8080"
 echo
 echo "To check status:  docker-compose ps"

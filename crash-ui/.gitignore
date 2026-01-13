@@ -1,3 +1,8 @@
+# Environment files with real URLs/secrets
+.env.production
+.env.local
+.env.*.local
+
 # Logs
 logs
 *.log

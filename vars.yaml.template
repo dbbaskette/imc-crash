@@ -87,3 +87,11 @@ thresholds:
   moderate_g_force: 3.0
   severe_speed_delta: 45
   moderate_speed_delta: 25
+
+# Database Configuration (Greenplum/PostgreSQL)
+# Used for crash-orchestrator, crash-policy, and crash-communications
+database:
+  url: "jdbc:postgresql://your-greenplum-host:5432/crash"
+  username: ""
+  password: ""
+

@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: crash-sink-scdf
+  cloud:
+    function:
+      definition: accidentDetector
+    stream:
+      bindings:
+        accidentDetector-in-0:
+          destination: ${TELEMETRY_INPUT_EXCHANGE:flattened_telemetry_exchange}
+          group: ${TELEMETRY_INPUT_GROUP:crash-detection-group}
+        accidentDetector-out-0:
+          destination: ${OUTPUT_EXCHANGE:vehicle_events}
+          content-type: application/json
+      rabbit:
+        bindings:
+          accidentDetector-in-0:
+            consumer:
+              exchangeType: ${TELEMETRY_INPUT_EXCHANGE_TYPE:fanout}
+              auto-bind-dlq: true
+              durable-subscription: true
+              max-attempts: 3
+          accidentDetector-out-0:
+            producer:
+              requiredGroups: ${OUTPUT_REQUIRED_GROUPS:vehicle-events-group}
+
+# Accident detection threshold
+telemetry:
+  accident:
+    gforce:
+      threshold: ${ACCIDENT_GFORCE_THRESHOLD:2.5}
+
+# Orchestrator connection
+orchestrator:
+  url: ${ORCHESTRATOR_URL:http://localhost:8080}
+
+# Actuator endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+
+# Server port
+server:
+  port: ${SERVER_PORT:8089}
+
+# Logging
+logging:
+  level:
+    com.insurancemegacorp: ${LOG_LEVEL:INFO}
+    org.springframework.cloud.stream: INFO

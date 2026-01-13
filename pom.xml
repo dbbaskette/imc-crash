@@ -21,6 +21,7 @@
         <module>crash-mcp-communications</module>
         <module>crash-orchestrator</module>
         <module>crash-sink</module>
+        <module>crash-sink-scdf</module>
     </modules>
 
     <properties>

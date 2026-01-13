@@ -1,0 +1,17 @@
+# Staticfile buildpack configuration for Cloud Foundry
+# https://docs.cloudfoundry.org/buildpacks/staticfile/
+
+# Enable nginx to serve index.html for any route (SPA support)
+pushstate: enabled
+
+# Enable gzip compression
+gzip: on
+
+# Set root directory (dist is where Vite outputs)
+root: dist
+
+# Force HTTPS in production
+force_https: true
+
+# Custom headers for security
+http_strict_transport_security: true

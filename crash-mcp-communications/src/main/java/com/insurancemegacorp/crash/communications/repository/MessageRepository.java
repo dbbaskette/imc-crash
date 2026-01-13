@@ -44,4 +44,9 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
      * Results ordered by sent_at descending (newest first).
      */
     List<Message> findByPolicyIdOrderBySentAtDesc(Integer policyId);
+
+    /**
+     * Delete all messages for a specific recipient type (ADJUSTER or CUSTOMER).
+     */
+    void deleteByRecipientType(String recipientType);
 }

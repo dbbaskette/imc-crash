@@ -73,15 +73,16 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = () => {
 
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
-    if (!confirm(`Delete ${selectedIds.size} selected message(s)?`)) return;
+    if (!confirm(`Delete ${selectedIds.size} selected customer message(s)?`)) return;
 
     try {
-      await messageAPI.deleteAllMessages();
+      // Delete only customer messages
+      await messageAPI.deleteCustomerMessages();
       setMessages([]);
       setSelectedIds(new Set());
       setSelectedId(null);
     } catch (error) {
-      console.error('Failed to delete messages:', error);
+      console.error('Failed to delete customer messages:', error);
     }
   };
 

@@ -53,4 +53,25 @@ export const messageAPI = {
   deleteAllMessages: async (): Promise<void> => {
     await apiClient.delete('/messages');
   },
+
+  /**
+   * Delete all adjuster messages
+   */
+  deleteAdjusterMessages: async (): Promise<void> => {
+    await apiClient.delete('/messages/adjuster');
+  },
+
+  /**
+   * Delete all customer messages
+   */
+  deleteCustomerMessages: async (): Promise<void> => {
+    await apiClient.delete('/messages/customer');
+  },
+
+  /**
+   * Delete a specific message by ID
+   */
+  deleteMessage: async (id: number): Promise<void> => {
+    await apiClient.delete(`/messages/${id}`);
+  },
 };

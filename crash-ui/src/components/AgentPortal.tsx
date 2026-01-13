@@ -69,15 +69,16 @@ export const AgentPortal: React.FC = () => {
 
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
-    if (!confirm(`Delete ${selectedIds.size} selected message(s)?`)) return;
+    if (!confirm(`Delete ${selectedIds.size} selected adjuster message(s)?`)) return;
 
     try {
-      await messageAPI.deleteAllMessages();
+      // Delete only adjuster messages
+      await messageAPI.deleteAdjusterMessages();
       setMessages([]);
       setSelectedIds(new Set());
       setSelectedId(null);
     } catch (error) {
-      console.error('Failed to delete messages:', error);
+      console.error('Failed to delete adjuster messages:', error);
     }
   };
 

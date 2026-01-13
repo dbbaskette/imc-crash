@@ -4,6 +4,7 @@ import com.insurancemegacorp.crash.communications.model.Message;
 import com.insurancemegacorp.crash.communications.repository.MessageRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -85,5 +86,34 @@ public class MessageController {
     public void deleteAllMessages() {
         log.info("Deleting all messages");
         messageRepository.deleteAll();
+    }
+
+    /**
+     * Delete all adjuster messages.
+     */
+    @DeleteMapping("/adjuster")
+    @Transactional
+    public void deleteAdjusterMessages() {
+        log.info("Deleting all adjuster messages");
+        messageRepository.deleteByRecipientType("ADJUSTER");
+    }
+
+    /**
+     * Delete all customer messages.
+     */
+    @DeleteMapping("/customer")
+    @Transactional
+    public void deleteCustomerMessages() {
+        log.info("Deleting all customer messages");
+        messageRepository.deleteByRecipientType("CUSTOMER");
+    }
+
+    /**
+     * Delete a specific message by ID.
+     */
+    @DeleteMapping("/{id}")
+    public void deleteMessage(@PathVariable Long id) {
+        log.info("Deleting message with ID: {}", id);
+        messageRepository.deleteById(id);
     }
 }

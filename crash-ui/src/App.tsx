@@ -58,7 +58,7 @@ function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-hidden">
       {/* Header */}
       <header className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700/50 sticky top-0 z-50">
         <div className="max-w-[1920px] mx-auto px-6 py-4">
@@ -121,8 +121,8 @@ function App() {
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-[1920px] mx-auto p-6">
-        <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl border border-slate-700/30 shadow-xl min-h-[calc(100vh-180px)]">
+      <main className="flex-1 flex flex-col min-h-0 p-4">
+        <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl border border-slate-700/30 shadow-xl flex-1 flex flex-col min-h-0 overflow-hidden">
           {activeTab === 'architecture' && <ArchitectureView agentStatus={agentStatus} />}
           {activeTab === 'agent' && <AgentPortal />}
           {activeTab === 'customer' && <CustomerPortal customers={customers} />}

@@ -93,7 +93,7 @@ export const AgentPortal: React.FC = () => {
   }
 
   return (
-    <div className="grid grid-cols-[280px_1fr] h-[calc(100vh-180px)] overflow-hidden">
+    <div className="grid grid-cols-[280px_1fr] h-full min-h-0 overflow-hidden">
       {/* Left Panel - Email List */}
       <div className="flex flex-col border-r border-slate-700/50 bg-slate-800/20">
         {/* Toolbar */}

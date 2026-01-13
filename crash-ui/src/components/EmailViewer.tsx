@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 
 interface EmailViewerProps {
   html: string;
@@ -10,6 +10,7 @@ interface EmailViewerProps {
  */
 export const EmailViewer: React.FC<EmailViewerProps> = ({ html }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(600);
 
   useEffect(() => {
     if (iframeRef.current) {
@@ -19,6 +20,26 @@ export const EmailViewer: React.FC<EmailViewerProps> = ({ html }) => {
         doc.open();
         doc.write(html);
         doc.close();
+
+        // Auto-resize iframe to content height
+        const resizeObserver = new ResizeObserver(() => {
+          if (doc.body) {
+            const newHeight = Math.max(doc.body.scrollHeight, 400);
+            setHeight(newHeight);
+          }
+        });
+
+        if (doc.body) {
+          resizeObserver.observe(doc.body);
+          // Initial height
+          setTimeout(() => {
+            if (doc.body) {
+              setHeight(Math.max(doc.body.scrollHeight, 400));
+            }
+          }, 100);
+        }
+
+        return () => resizeObserver.disconnect();
       }
     }
   }, [html]);
@@ -29,7 +50,7 @@ export const EmailViewer: React.FC<EmailViewerProps> = ({ html }) => {
       title="Email content"
       style={{
         width: '100%',
-        height: '100%',
+        height: `${height}px`,
         border: 'none',
         display: 'block',
       }}

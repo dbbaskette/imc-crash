@@ -1,0 +1,14 @@
+# Override .gitignore for CF deployment
+# Include dist folder (needed for deployment)
+node_modules
+*.log
+.env.production
+.env.local
+.env.*.local
+src
+public
+*.md
+*.json
+*.ts
+*.js
+!dist/**

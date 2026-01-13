@@ -13,18 +13,10 @@
     <description>Embabel agent orchestrator that consumes vehicle accident events and generates FNOL reports</description>
 
     <dependencies>
-        <!-- Embabel Agent Framework -->
+        <!-- Embabel Agent Framework (Google Gemini only for CF deployment) -->
         <dependency>
             <groupId>com.embabel.agent</groupId>
             <artifactId>embabel-agent-starter</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.embabel.agent</groupId>
-            <artifactId>embabel-agent-starter-openai</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.embabel.agent</groupId>
-            <artifactId>embabel-agent-starter-anthropic</artifactId>
         </dependency>
         <dependency>
             <groupId>com.embabel.agent</groupId>
@@ -35,14 +27,6 @@
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-mcp-client</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-starter-model-openai</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-anthropic</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.ai</groupId>
@@ -95,33 +79,6 @@
             <artifactId>crash-domain</artifactId>
         </dependency>
 
-        <!-- MCP Service modules for direct service calls -->
-        <dependency>
-            <groupId>com.insurancemegacorp</groupId>
-            <artifactId>crash-mcp-impact-analyst</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.insurancemegacorp</groupId>
-            <artifactId>crash-mcp-environment</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.insurancemegacorp</groupId>
-            <artifactId>crash-mcp-policy</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.insurancemegacorp</groupId>
-            <artifactId>crash-mcp-services</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.insurancemegacorp</groupId>
-            <artifactId>crash-mcp-communications</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
         <!-- Test dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -131,6 +88,7 @@
     </dependencies>
 
     <build>
+        <finalName>crash-orchestrator</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
@@ -138,4 +96,56 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- Profile for local Docker development with embedded MCP servers and all LLM providers -->
+        <profile>
+            <id>local</id>
+            <dependencies>
+                <!-- Additional LLM providers for local development -->
+                <dependency>
+                    <groupId>com.embabel.agent</groupId>
+                    <artifactId>embabel-agent-starter-openai</artifactId>
+                </dependency>
+                <dependency>
+                    <groupId>com.embabel.agent</groupId>
+                    <artifactId>embabel-agent-starter-anthropic</artifactId>
+                </dependency>
+                <dependency>
+                    <groupId>org.springframework.ai</groupId>
+                    <artifactId>spring-ai-starter-model-openai</artifactId>
+                </dependency>
+                <dependency>
+                    <groupId>org.springframework.ai</groupId>
+                    <artifactId>spring-ai-anthropic</artifactId>
+                </dependency>
+                <!-- Embedded MCP servers -->
+                <dependency>
+                    <groupId>com.insurancemegacorp</groupId>
+                    <artifactId>crash-mcp-impact-analyst</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>com.insurancemegacorp</groupId>
+                    <artifactId>crash-mcp-environment</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>com.insurancemegacorp</groupId>
+                    <artifactId>crash-mcp-policy</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>com.insurancemegacorp</groupId>
+                    <artifactId>crash-mcp-services</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>com.insurancemegacorp</groupId>
+                    <artifactId>crash-mcp-communications</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>

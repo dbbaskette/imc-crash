@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import type { AgentStatusMessage } from '../types';
-import './ArchitectureView.css';
 
 type ActionStatus = 'idle' | 'active' | 'completed';
 
@@ -23,10 +22,8 @@ interface ArchitectureViewProps {
   agentStatus: AgentStatusMessage | null;
 }
 
-// Node definitions matching the actual GOAP execution flow
-// The 'actionKey' matches the action name sent in WebSocket broadcasts
 interface NodeDef {
-  actionKey: string; // matches the 'action' field from WebSocket
+  actionKey: string;
   name: string;
   subtitle?: string;
   x: number;
@@ -34,44 +31,31 @@ interface NodeDef {
 }
 
 const NODES: Record<string, NodeDef> = {
-  // Input
   accidentEvent: { actionKey: 'accident-event', name: 'AccidentEvent', subtitle: '(from telemetry)', x: 400, y: 50 },
-  // Level 0 - Parallel Execution
   gatherEnvironment: { actionKey: 'gatherEnvironment', name: 'gatherEnvironment', x: 150, y: 170 },
   analyzeImpact: { actionKey: 'analyzeImpact', name: 'analyzeImpact', x: 400, y: 170 },
   lookupPolicy: { actionKey: 'lookupPolicy', name: 'lookupPolicy', x: 650, y: 170 },
-  // Level 1 - Parallel Execution (services + comms run concurrently)
   findServices: { actionKey: 'findServices', name: 'findServices', x: 280, y: 310 },
   initiateComms: { actionKey: 'initiateComms', name: 'initiateComms', x: 520, y: 310 },
-  // Level 2 - Aggregation
   compileReport: { actionKey: 'compileReport', name: 'compileReport', x: 400, y: 450 },
-  // Level 3 - Goal Achievement (sends emails)
   sendFnolToAdjuster: { actionKey: 'sendFnolToAdjuster', name: 'sendFnolToAdjuster', x: 400, y: 550 },
-  // Final
   emailSent: { actionKey: 'goal-achieved', name: 'Email sent + DB persisted', x: 400, y: 640 },
 };
 
-// Connections between nodes
 const CONNECTIONS = [
-  // From AccidentEvent to Level 0 (parallel)
   { from: 'accidentEvent', to: 'gatherEnvironment' },
   { from: 'accidentEvent', to: 'analyzeImpact' },
   { from: 'accidentEvent', to: 'lookupPolicy' },
-  // From Level 0 to Level 1 (parallel)
   { from: 'analyzeImpact', to: 'findServices' },
   { from: 'analyzeImpact', to: 'initiateComms' },
   { from: 'lookupPolicy', to: 'initiateComms' },
-  // All feed into compileReport
   { from: 'gatherEnvironment', to: 'compileReport' },
   { from: 'findServices', to: 'compileReport' },
   { from: 'initiateComms', to: 'compileReport' },
-  // compileReport goes to sendFnolToAdjuster
   { from: 'compileReport', to: 'sendFnolToAdjuster' },
-  // sendFnolToAdjuster completes the flow
   { from: 'sendFnolToAdjuster', to: 'emailSent' },
 ];
 
-// Level labels - Both Level 0 and Level 1 execute in parallel using CompletableFuture
 const LEVELS = [
   { y: 170, label: 'Level 0 - Parallel (Impact, Env, Policy)', width: 620 },
   { y: 310, label: 'Level 1 - Parallel (Services, Comms)', width: 360 },
@@ -79,17 +63,14 @@ const LEVELS = [
 ];
 
 export function ArchitectureView({ agentStatus }: ArchitectureViewProps) {
-  // Track status by action name (e.g., "analyzeImpact", "gatherEnvironment")
   const [actionStates, setActionStates] = useState<Record<string, ActionState>>({});
   const [goalAchieved, setGoalAchieved] = useState(false);
 
   useEffect(() => {
     if (agentStatus) {
       const { action, status } = agentStatus;
-
       console.log('Received agent status:', agentStatus);
 
-      // Update the action state
       setActionStates((prev) => ({
         ...prev,
         [action]: {
@@ -97,14 +78,11 @@ export function ArchitectureView({ agentStatus }: ArchitectureViewProps) {
         },
       }));
 
-      // Check if this is the final action completing
       if (action === 'sendFnolToAdjuster' && status === 'COMPLETED') {
         setGoalAchieved(true);
-        // Reset goal after a while
         setTimeout(() => setGoalAchieved(false), 10000);
       }
 
-      // Auto-fade back to idle after completion (keep visible longer)
       if (status === 'COMPLETED') {
         setTimeout(() => {
           setActionStates((prev) => ({
@@ -120,23 +98,45 @@ export function ArchitectureView({ agentStatus }: ArchitectureViewProps) {
     return actionStates[actionKey]?.status ?? 'idle';
   }
 
-  function getNodeClassName(type: 'input' | 'action' | 'output' | 'goal', status: ActionStatus): string {
-    const base = 'goap-node';
-    switch (type) {
-      case 'input':
-        return `${base} input-node`;
-      case 'goal':
-        return goalAchieved ? `${base} goal-node achieved` : `${base} goal-node`;
+  function getNodeFill(type: 'input' | 'action' | 'goal', status: ActionStatus): string {
+    if (type === 'input') return 'url(#inputGradient)';
+    if (type === 'goal') return goalAchieved ? 'url(#goalGradient)' : 'url(#idleGradient)';
+
+    switch (status) {
+      case 'active':
+        return 'url(#activeGradient)';
+      case 'completed':
+        return 'url(#completedGradient)';
       default:
-        return `${base} action-node ${status}`;
+        return 'url(#idleGradient)';
     }
   }
 
-  function renderNode(key: string, node: NodeDef, type: 'input' | 'action' | 'output' | 'goal') {
+  function getNodeStroke(type: 'input' | 'action' | 'goal', status: ActionStatus): string {
+    if (type === 'input') return '#6366f1';
+    if (type === 'goal') return goalAchieved ? '#10b981' : '#475569';
+
+    switch (status) {
+      case 'active':
+        return '#3b82f6';
+      case 'completed':
+        return '#10b981';
+      default:
+        return '#475569';
+    }
+  }
+
+  function getGlowFilter(type: 'input' | 'action' | 'goal', status: ActionStatus): string {
+    if (type === 'goal' && goalAchieved) return 'url(#goalGlow)';
+    if (status === 'active') return 'url(#activeGlow)';
+    if (status === 'completed') return 'url(#completedGlow)';
+    return '';
+  }
+
+  function renderNode(key: string, node: NodeDef, type: 'input' | 'action' | 'goal') {
     const status = getActionStatus(node.actionKey);
-    const width = type === 'goal' ? 180 : 140;
-    const height = type === 'input' && node.subtitle ? 50 : 40;
-    const className = getNodeClassName(type, status);
+    const width = type === 'goal' ? 200 : 150;
+    const height = type === 'input' && node.subtitle ? 55 : 45;
 
     return (
       <g key={key}>
@@ -145,14 +145,33 @@ export function ArchitectureView({ agentStatus }: ArchitectureViewProps) {
           y={node.y - height / 2}
           width={width}
           height={height}
-          rx={type === 'goal' ? 8 : 4}
-          className={className}
+          rx={type === 'goal' ? 12 : 8}
+          fill={getNodeFill(type, status)}
+          stroke={getNodeStroke(type, status)}
+          strokeWidth={2}
+          filter={getGlowFilter(type, status)}
+          className={status === 'active' ? 'animate-pulse' : ''}
         />
-        <text x={node.x} y={node.subtitle ? node.y - 2 : node.y + 4} textAnchor="middle" className="node-text">
+        <text
+          x={node.x}
+          y={node.subtitle ? node.y - 4 : node.y + 4}
+          textAnchor="middle"
+          fill="#fff"
+          fontSize="12"
+          fontFamily="'Inter', system-ui, sans-serif"
+          fontWeight="500"
+        >
           {node.name}
         </text>
         {node.subtitle && (
-          <text x={node.x} y={node.y + 14} textAnchor="middle" className="node-subtitle">
+          <text
+            x={node.x}
+            y={node.y + 14}
+            textAnchor="middle"
+            fill="#94a3b8"
+            fontSize="10"
+            fontFamily="'Inter', system-ui, sans-serif"
+          >
             {node.subtitle}
           </text>
         )}
@@ -165,15 +184,18 @@ export function ArchitectureView({ agentStatus }: ArchitectureViewProps) {
     const toNode = NODES[conn.to];
     if (!fromNode || !toNode) return null;
 
-    const fromY = fromNode.y + 20;
-    const toY = toNode.y - 20;
+    const fromY = fromNode.y + 22;
+    const toY = toNode.y - 22;
     const midY = (fromY + toY) / 2;
 
     return (
       <path
         key={index}
         d={`M ${fromNode.x} ${fromY} C ${fromNode.x} ${midY}, ${toNode.x} ${midY}, ${toNode.x} ${toY}`}
-        className="connection-line"
+        fill="none"
+        stroke="url(#connectionGradient)"
+        strokeWidth="2"
+        strokeLinecap="round"
         markerEnd="url(#arrowhead)"
       />
     );
@@ -186,13 +208,23 @@ export function ArchitectureView({ agentStatus }: ArchitectureViewProps) {
       <g key={index}>
         <rect
           x={x}
-          y={level.y - 50}
+          y={level.y - 55}
           width={level.width}
-          height={100}
-          rx={8}
-          className="level-background"
+          height={110}
+          rx={12}
+          fill="url(#levelGradient)"
+          stroke="#334155"
+          strokeWidth="1"
         />
-        <text x={400} y={level.y - 58} textAnchor="middle" className="level-label">
+        <text
+          x={400}
+          y={level.y - 65}
+          textAnchor="middle"
+          fill="#64748b"
+          fontSize="11"
+          fontFamily="'Inter', system-ui, sans-serif"
+          fontWeight="500"
+        >
           {level.label}
         </text>
       </g>
@@ -200,11 +232,84 @@ export function ArchitectureView({ agentStatus }: ArchitectureViewProps) {
   }
 
   return (
-    <div className="architecture-view">
-      <h2>GOAP Execution Flow</h2>
-      <svg width="800" height="700" className="goap-diagram">
-        {/* Arrow marker definition */}
+    <div className="p-8 flex flex-col items-center">
+      <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+        <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-sm">
+          ⚡
+        </span>
+        GOAP Execution Flow
+      </h2>
+
+      <svg width="800" height="720" className="rounded-xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
         <defs>
+          {/* Gradients for nodes */}
+          <linearGradient id="idleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#334155" />
+            <stop offset="100%" stopColor="#1e293b" />
+          </linearGradient>
+
+          <linearGradient id="inputGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#4f46e5" />
+            <stop offset="100%" stopColor="#6366f1" />
+          </linearGradient>
+
+          <linearGradient id="activeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#2563eb" />
+            <stop offset="100%" stopColor="#3b82f6" />
+          </linearGradient>
+
+          <linearGradient id="completedGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#059669" />
+            <stop offset="100%" stopColor="#10b981" />
+          </linearGradient>
+
+          <linearGradient id="goalGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#047857" />
+            <stop offset="100%" stopColor="#10b981" />
+          </linearGradient>
+
+          <linearGradient id="levelGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="rgba(51, 65, 85, 0.3)" />
+            <stop offset="100%" stopColor="rgba(30, 41, 59, 0.3)" />
+          </linearGradient>
+
+          <linearGradient id="connectionGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#475569" />
+            <stop offset="100%" stopColor="#64748b" />
+          </linearGradient>
+
+          {/* Glow filters */}
+          <filter id="activeGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feFlood floodColor="#3b82f6" floodOpacity="0.5" />
+            <feComposite in2="blur" operator="in" />
+            <feMerge>
+              <feMergeNode />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+
+          <filter id="completedGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feFlood floodColor="#10b981" floodOpacity="0.4" />
+            <feComposite in2="blur" operator="in" />
+            <feMerge>
+              <feMergeNode />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+
+          <filter id="goalGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="6" result="blur" />
+            <feFlood floodColor="#10b981" floodOpacity="0.6" />
+            <feComposite in2="blur" operator="in" />
+            <feMerge>
+              <feMergeNode />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+
+          {/* Arrow marker */}
           <marker
             id="arrowhead"
             markerWidth="10"
@@ -213,7 +318,7 @@ export function ArchitectureView({ agentStatus }: ArchitectureViewProps) {
             refY="3.5"
             orient="auto"
           >
-            <polygon points="0 0, 10 3.5, 0 7" fill="#888" />
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
           </marker>
         </defs>
 
@@ -223,46 +328,32 @@ export function ArchitectureView({ agentStatus }: ArchitectureViewProps) {
         {/* Connections */}
         {CONNECTIONS.map((conn, i) => renderConnection(conn, i))}
 
-        {/* Input node */}
+        {/* Nodes */}
         {renderNode('accidentEvent', NODES.accidentEvent, 'input')}
-
-        {/* Level 0 - Parallel Execution */}
         {renderNode('gatherEnvironment', NODES.gatherEnvironment, 'action')}
         {renderNode('analyzeImpact', NODES.analyzeImpact, 'action')}
         {renderNode('lookupPolicy', NODES.lookupPolicy, 'action')}
-
-        {/* Level 1 - Severity-Dependent */}
         {renderNode('findServices', NODES.findServices, 'action')}
         {renderNode('initiateComms', NODES.initiateComms, 'action')}
-
-        {/* Level 2 - Compile Report */}
         {renderNode('compileReport', NODES.compileReport, 'action')}
-
-        {/* Level 3 - Send Emails */}
         {renderNode('sendFnolToAdjuster', NODES.sendFnolToAdjuster, 'action')}
-
-        {/* Goal achieved */}
         {renderNode('emailSent', NODES.emailSent, 'goal')}
       </svg>
 
-      <div className="legend">
-        <div className="legend-item">
-          <div className="legend-color idle"></div>
-          <span>Idle</span>
-        </div>
-        <div className="legend-item">
-          <div className="legend-color active"></div>
-          <span>Active</span>
-        </div>
-        <div className="legend-item">
-          <div className="legend-color completed"></div>
-          <span>Completed</span>
-        </div>
-        <div className="legend-item">
-          <div className="legend-color goal"></div>
-          <span>Goal Achieved</span>
-        </div>
+      {/* Legend */}
+      <div className="flex gap-6 mt-6">
+        {[
+          { label: 'Idle', color: 'bg-slate-600' },
+          { label: 'Active', color: 'bg-blue-500', glow: true },
+          { label: 'Completed', color: 'bg-emerald-500' },
+          { label: 'Goal Achieved', color: 'bg-emerald-400', ring: true },
+        ].map((item) => (
+          <div key={item.label} className="flex items-center gap-2">
+            <div className={`w-4 h-4 rounded ${item.color} ${item.glow ? 'animate-pulse shadow-lg shadow-blue-500/50' : ''} ${item.ring ? 'ring-2 ring-emerald-400/50' : ''}`} />
+            <span className="text-sm text-slate-400">{item.label}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
-};
+}

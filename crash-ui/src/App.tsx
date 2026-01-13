@@ -4,12 +4,16 @@ import { ArchitectureView } from './components/ArchitectureView';
 import { AgentPortal } from './components/AgentPortal';
 import { CustomerPortal } from './components/CustomerPortal';
 import type { AgentStatusMessage, Customer } from './types';
-import './App.css';
 
 type Tab = 'architecture' | 'agent' | 'customer';
 
+const tabs: { id: Tab; label: string; icon: string }[] = [
+  { id: 'architecture', label: 'Architecture', icon: '⚡' },
+  { id: 'agent', label: 'Agent Portal', icon: '📋' },
+  { id: 'customer', label: 'Customer Portal', icon: '👤' },
+];
+
 function App() {
-  // Persist tab state in localStorage
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const saved = localStorage.getItem('crash-ui-tab');
     return (saved as Tab) || 'architecture';
@@ -35,7 +39,6 @@ function App() {
           timestamp: message.timestamp,
         };
         setCustomers((prev) => {
-          // Avoid duplicates
           if (prev.some((c) => c.claimReference === customer.claimReference)) {
             return prev;
           }
@@ -55,40 +58,75 @@ function App() {
   }, []);
 
   return (
-    <div className="App">
-      <header className="app-header">
-        <h1>🚗 CRASH - Claims Response Agent System Hive</h1>
-        <div className="connection-status">
-          <span className={`status-dot ${connected ? 'connected' : 'disconnected'}`}></span>
-          {connected ? 'Connected' : 'Disconnected'}
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Header */}
+      <header className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700/50 sticky top-0 z-50">
+        <div className="max-w-[1920px] mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            {/* Logo and Title */}
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <span className="text-xl">🚗</span>
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white tracking-tight">CRASH</h1>
+                <p className="text-xs text-slate-400">Claims Response Agent System Hive</p>
+              </div>
+            </div>
+
+            {/* Connection Status */}
+            <div className="flex items-center gap-3">
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ${
+                connected
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  : 'bg-red-500/10 text-red-400 border border-red-500/20'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${
+                  connected
+                    ? 'bg-emerald-400 shadow-lg shadow-emerald-500/50 animate-pulse'
+                    : 'bg-red-400'
+                }`} />
+                {connected ? 'Connected' : 'Disconnected'}
+              </div>
+            </div>
+          </div>
         </div>
       </header>
 
-      <nav className="tabs">
-        <button
-          className={`tab ${activeTab === 'architecture' ? 'active' : ''}`}
-          onClick={() => handleTabChange('architecture')}
-        >
-          Architecture View
-        </button>
-        <button
-          className={`tab ${activeTab === 'agent' ? 'active' : ''}`}
-          onClick={() => handleTabChange('agent')}
-        >
-          Agent Portal
-        </button>
-        <button
-          className={`tab ${activeTab === 'customer' ? 'active' : ''}`}
-          onClick={() => handleTabChange('customer')}
-        >
-          Customer Portal
-        </button>
+      {/* Navigation Tabs */}
+      <nav className="bg-slate-800/30 border-b border-slate-700/30">
+        <div className="max-w-[1920px] mx-auto px-6">
+          <div className="flex gap-1">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`relative px-5 py-3 text-sm font-medium transition-all duration-200 ${
+                  activeTab === tab.id
+                    ? 'text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <span>{tab.icon}</span>
+                  {tab.label}
+                </span>
+                {activeTab === tab.id && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
       </nav>
 
-      <main className="content">
-        {activeTab === 'architecture' && <ArchitectureView agentStatus={agentStatus} />}
-        {activeTab === 'agent' && <AgentPortal />}
-        {activeTab === 'customer' && <CustomerPortal customers={customers} />}
+      {/* Main Content */}
+      <main className="max-w-[1920px] mx-auto p-6">
+        <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl border border-slate-700/30 shadow-xl min-h-[calc(100vh-180px)]">
+          {activeTab === 'architecture' && <ArchitectureView agentStatus={agentStatus} />}
+          {activeTab === 'agent' && <AgentPortal />}
+          {activeTab === 'customer' && <CustomerPortal customers={customers} />}
+        </div>
       </main>
     </div>
   );

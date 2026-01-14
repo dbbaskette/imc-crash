@@ -192,8 +192,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = () => {
             </div>
 
             {/* Email Body */}
-            <div className="flex-1 overflow-auto p-6">
-              <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div className="overflow-y-auto p-6" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+              <div className="bg-white rounded-xl shadow-lg">
                 <EmailViewer html={selectedMessage.body} />
               </div>
             </div>

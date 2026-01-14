@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { messageAPI } from '../services/api';
 import { EmailViewer } from './EmailViewer';
+import { IPhoneSMS } from './IPhoneSMS';
 import type { Message, Customer } from '../types';
 
 interface CustomerPortalProps {
@@ -120,7 +121,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = () => {
           >
             Delete ({selectedIds.size})
           </button>
-          <span className="ml-auto text-xs text-slate-500">{messages.length} emails</span>
+          <span className="ml-auto text-xs text-slate-500">{messages.length} messages</span>
         </div>
 
         {/* Email List */}
@@ -130,8 +131,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = () => {
               <div className="w-16 h-16 rounded-full bg-slate-700/50 flex items-center justify-center mb-4">
                 <span className="text-2xl">👤</span>
               </div>
-              <p className="text-slate-400 font-medium">No customer emails yet</p>
-              <p className="text-slate-500 text-sm mt-1">Trigger an accident to see emails appear here</p>
+              <p className="text-slate-400 font-medium">No customer messages yet</p>
+              <p className="text-slate-500 text-sm mt-1">Trigger an accident to see messages appear here</p>
             </div>
           ) : (
             messages.map((msg) => (
@@ -154,8 +155,17 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = () => {
                   className="w-4 h-4 mt-0.5 rounded border-slate-600 bg-slate-700 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 cursor-pointer flex-shrink-0"
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-white truncate">
-                    {msg.customerName || 'Customer'}
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                      msg.messageType === 'SMS'
+                        ? 'bg-green-500/20 text-green-400'
+                        : 'bg-blue-500/20 text-blue-400'
+                    }`}>
+                      {msg.messageType === 'SMS' ? 'SMS' : 'Email'}
+                    </span>
+                    <span className="text-sm font-medium text-white truncate">
+                      {msg.customerName || 'Customer'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between mt-1">
                     <span className="text-xs font-mono bg-slate-700/50 text-slate-300 px-1.5 py-0.5 rounded">
@@ -175,29 +185,63 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = () => {
       {/* Right Panel - Email Detail */}
       <div className="flex flex-col overflow-hidden bg-slate-800/10">
         {selectedMessage ? (
-          <>
-            {/* Email Header */}
-            <div className="px-6 py-4 border-b border-slate-700/50 bg-slate-800/20">
-              <h2 className="text-lg font-semibold text-white mb-2">{selectedMessage.subject}</h2>
-              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
-                <div className="text-slate-400">
-                  <span className="text-slate-500">Claim:</span>{' '}
-                  <span className="font-mono text-slate-300">{selectedMessage.claimReference}</span>
+          selectedMessage.messageType === 'SMS' ? (
+            /* SMS View with iPhone Mockup */
+            <div className="flex-1 overflow-y-auto">
+              <div className="px-6 py-4 border-b border-slate-700/50 bg-slate-800/20">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs px-2 py-1 rounded font-medium bg-green-500/20 text-green-400">
+                    SMS
+                  </span>
+                  <h2 className="text-lg font-semibold text-white">
+                    Message to {selectedMessage.customerName || 'Customer'}
+                  </h2>
                 </div>
-                <div className="text-slate-400">
-                  <span className="text-slate-500">Sent:</span>{' '}
-                  <span className="text-slate-300">{new Date(selectedMessage.sentAt).toLocaleString()}</span>
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm mt-2">
+                  <div className="text-slate-400">
+                    <span className="text-slate-500">Claim:</span>{' '}
+                    <span className="font-mono text-slate-300">{selectedMessage.claimReference}</span>
+                  </div>
+                  <div className="text-slate-400">
+                    <span className="text-slate-500">Sent:</span>{' '}
+                    <span className="text-slate-300">{new Date(selectedMessage.sentAt).toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
+              <IPhoneSMS
+                message={selectedMessage.body}
+                timestamp={selectedMessage.sentAt}
+              />
             </div>
+          ) : (
+            /* Email View */
+            <>
+              <div className="px-6 py-4 border-b border-slate-700/50 bg-slate-800/20">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs px-2 py-1 rounded font-medium bg-blue-500/20 text-blue-400">
+                    Email
+                  </span>
+                  <h2 className="text-lg font-semibold text-white">{selectedMessage.subject}</h2>
+                </div>
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm mt-2">
+                  <div className="text-slate-400">
+                    <span className="text-slate-500">Claim:</span>{' '}
+                    <span className="font-mono text-slate-300">{selectedMessage.claimReference}</span>
+                  </div>
+                  <div className="text-slate-400">
+                    <span className="text-slate-500">Sent:</span>{' '}
+                    <span className="text-slate-300">{new Date(selectedMessage.sentAt).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
 
-            {/* Email Body */}
-            <div className="overflow-y-auto p-6" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-              <div className="bg-white rounded-xl shadow-lg">
-                <EmailViewer html={selectedMessage.body} />
+              <div className="overflow-y-auto p-6" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+                <div className="bg-white rounded-xl shadow-lg">
+                  <EmailViewer html={selectedMessage.body} />
+                </div>
               </div>
-            </div>
-          </>
+            </>
+          )
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-20 h-20 rounded-full bg-slate-700/30 flex items-center justify-center mb-4">

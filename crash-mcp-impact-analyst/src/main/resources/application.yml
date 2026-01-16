@@ -17,8 +17,8 @@ spring:
         name: impact-analyst
         version: 1.0.0
         type: SYNC
-        protocol: STREAMABLE
-        streamable-http:
+        protocol: STATELESS
+        stateless:
           mcp-endpoint: /mcp
         annotation-scanner:
           enabled: true

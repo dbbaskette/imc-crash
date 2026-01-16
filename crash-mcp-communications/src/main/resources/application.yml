@@ -27,8 +27,8 @@ spring:
         name: communications-agent
         version: 1.0.0
         type: SYNC
-        protocol: STREAMABLE
-        streamable-http:
+        protocol: STATELESS
+        stateless:
           mcp-endpoint: /mcp
         instructions: |
           Communications Agent - Handles driver and adjuster communications.

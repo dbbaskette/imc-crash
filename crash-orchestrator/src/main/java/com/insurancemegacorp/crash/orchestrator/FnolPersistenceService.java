@@ -19,10 +19,12 @@ public class FnolPersistenceService {
     private static final Logger log = LoggerFactory.getLogger(FnolPersistenceService.class);
 
     private final FnolRepository repository;
+    private final StatsService statsService;
     private final ObjectMapper objectMapper;
 
-    public FnolPersistenceService(FnolRepository repository) {
+    public FnolPersistenceService(FnolRepository repository, StatsService statsService) {
         this.repository = repository;
+        this.statsService = statsService;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
         this.objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
@@ -41,6 +43,7 @@ public class FnolPersistenceService {
         // Check for duplicate
         if (repository.existsByClaimNumber(report.claimNumber())) {
             log.warn("FNOL report already exists for claim: {}", report.claimNumber());
+            statsService.incrementFnolProcessed();  // Count as processed even if duplicate
             return repository.findByClaimNumber(report.claimNumber()).orElse(null);
         }
 
@@ -54,6 +57,7 @@ public class FnolPersistenceService {
         }
 
         FnolEntity saved = repository.save(entity);
+        statsService.incrementFnolProcessed();
         log.info("FNOL report persisted: id={}, claim={}", saved.getId(), saved.getClaimNumber());
 
         return saved;

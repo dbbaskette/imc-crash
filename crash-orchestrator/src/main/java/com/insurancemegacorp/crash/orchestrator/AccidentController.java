@@ -20,10 +20,12 @@ public class AccidentController {
 
     private final FnolService fnolService;
     private final FnolPersistenceService persistenceService;
+    private final StatsService statsService;
 
-    public AccidentController(FnolService fnolService, FnolPersistenceService persistenceService) {
+    public AccidentController(FnolService fnolService, FnolPersistenceService persistenceService, StatsService statsService) {
         this.fnolService = fnolService;
         this.persistenceService = persistenceService;
+        this.statsService = statsService;
     }
 
     /**
@@ -34,6 +36,7 @@ public class AccidentController {
      */
     @PostMapping
     public ResponseEntity<FNOLReport> processAccident(@RequestBody AccidentEvent event) {
+        statsService.incrementAccidentsReported();
         log.info("ACCIDENT RECEIVED - policyId={}, vehicleId={}, driverId={}, vin={}",
                 event.policyId(), event.vehicleId(), event.driverId(), event.vin());
         log.info("Impact: gForce={}, speed={} mph (limit: {})",

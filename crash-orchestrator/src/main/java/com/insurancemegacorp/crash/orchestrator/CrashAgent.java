@@ -33,12 +33,14 @@ public class CrashAgent {
     private static final Logger log = LoggerFactory.getLogger(CrashAgent.class);
 
     private final AccidentStatusService statusService;
+    private final StatsService statsService;
 
     // Virtual thread executor for parallel execution (Java 21+)
     private final ExecutorService parallelExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
-    public CrashAgent(AccidentStatusService statusService) {
+    public CrashAgent(AccidentStatusService statusService, StatsService statsService) {
         this.statusService = statusService;
+        this.statsService = statsService;
     }
 
     /**
@@ -281,6 +283,11 @@ public class CrashAgent {
             NearbyServices services = servicesFuture.get();
             CommunicationsStatus communications = commsFuture.get();
 
+            // Track SMS sent
+            if (communications.driverOutreach() != null && communications.driverOutreach().smsSent()) {
+                statsService.incrementSmsSent();
+            }
+
             long duration = System.currentTimeMillis() - startTime;
             log.info("<<< PARALLEL EXECUTION COMPLETE: 2 Level-1 actions finished in {} ms", duration);
 
@@ -417,6 +424,7 @@ public class CrashAgent {
                 ),
                 EmailConfirmation.class
             );
+            statsService.incrementEmailsSent();
             log.info("FNOL email sent to adjuster for claim: {}", report.claimNumber());
         } catch (Exception e) {
             log.error("Failed to send adjuster FNOL email for claim {}: {}", report.claimNumber(), e.getMessage());
@@ -475,6 +483,7 @@ public class CrashAgent {
                 ),
                 EmailConfirmation.class
             );
+            statsService.incrementEmailsSent();
             log.info("Customer follow-up email sent successfully for claim: {}", report.claimNumber());
         } catch (Exception e) {
             log.error("Failed to send customer follow-up email for claim {}: {}", report.claimNumber(), e.getMessage(), e);
